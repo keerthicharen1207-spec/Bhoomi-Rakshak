@@ -1,19 +1,34 @@
 """Unified Multi-Hazard Risk Scoring & Physics-ML Hybrid Engine."""
 
 from typing import Dict, Any, Optional
-from .physics_engine import (
-    calculate_infinite_slope_fs,
-    calculate_rational_peak_discharge,
-    calculate_chandler_burning_index,
-    evaluate_id_threshold_breach,
-    calculate_seismic_hazard,
-    calculate_severe_storm_index,
-)
-from .ml_engine import (
-    predict_landslide_susceptibility,
-    predict_flood_depth,
-    predict_population_triage,
-)
+try:
+    from .physics_engine import (
+        calculate_infinite_slope_fs,
+        calculate_rational_peak_discharge,
+        calculate_chandler_burning_index,
+        evaluate_id_threshold_breach,
+        calculate_seismic_hazard,
+        calculate_severe_storm_index,
+    )
+    from .ml_engine import (
+        predict_landslide_susceptibility,
+        predict_flood_depth,
+        predict_population_triage,
+    )
+except (ImportError, ValueError):
+    from physics_engine import (
+        calculate_infinite_slope_fs,
+        calculate_rational_peak_discharge,
+        calculate_chandler_burning_index,
+        evaluate_id_threshold_breach,
+        calculate_seismic_hazard,
+        calculate_severe_storm_index,
+    )
+    from ml_engine import (
+        predict_landslide_susceptibility,
+        predict_flood_depth,
+        predict_population_triage,
+    )
 
 RAINFALL_24H_MAX_MM = 200.0
 RAINFALL_7D_WINDOW_DAYS = 7

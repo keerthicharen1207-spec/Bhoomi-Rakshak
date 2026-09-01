@@ -12,15 +12,26 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .alerts import build_messages, should_alert
-from .reports import status_for
-from .risk_engine import (
-    apply_rainfall,
-    calculate_risk_score,
-    risk_level,
-    evaluate_multihazard_zone_risk,
-)
-from .weather_service import fetch_zone_live_weather, OPENWEATHER_API_KEY
+try:
+    from .alerts import build_messages, should_alert
+    from .reports import status_for
+    from .risk_engine import (
+        apply_rainfall,
+        calculate_risk_score,
+        risk_level,
+        evaluate_multihazard_zone_risk,
+    )
+    from .weather_service import fetch_zone_live_weather, OPENWEATHER_API_KEY
+except (ImportError, ValueError):
+    from alerts import build_messages, should_alert
+    from reports import status_for
+    from risk_engine import (
+        apply_rainfall,
+        calculate_risk_score,
+        risk_level,
+        evaluate_multihazard_zone_risk,
+    )
+    from weather_service import fetch_zone_live_weather, OPENWEATHER_API_KEY
 
 DATABASE_PATH = Path(os.getenv("NER_DATABASE_PATH", Path(__file__).with_name("ner.db")))
 DISTRICTS_FILE = Path(__file__).parent / "data" / "india_districts.json"
