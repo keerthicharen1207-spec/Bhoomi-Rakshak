@@ -51,12 +51,17 @@ def calculate_risk_score(
 
 
 def risk_level(score: float) -> str:
-    """Map a score to the public risk-level bands."""
-    if score < 40:
+    """Map a score to the public standard 4-tier risk-level bands:
+    - Normal:   0 - 29 (score < 30)
+    - Watch:   30 - 49 (score < 50)
+    - Warning: 50 - 74 (score < 75)
+    - Evacuate:75 - 100 (score >= 75)
+    """
+    if score < 30:
         return "Normal"
-    if score < 70:
+    if score < 50:
         return "Watch"
-    if score < 85:
+    if score < 75:
         return "Warning"
     return "Evacuate"
 

@@ -12,7 +12,8 @@ def test_risk_scores_returns_seeded_zones(tmp_path, monkeypatch):
     assert response.status_code == 200
     zones = response.json()
     assert len(zones) == 18
-    assert {zone["risk_level"] for zone in zones} >= {"Normal", "Watch"}
+    assert {zone["risk_level"] for zone in zones}.issubset({"Normal", "Watch", "Warning", "Evacuate"})
+    assert len({zone["risk_level"] for zone in zones}) >= 2
     assert all(0 <= zone["risk_score"] <= 100 for zone in zones)
 
 
