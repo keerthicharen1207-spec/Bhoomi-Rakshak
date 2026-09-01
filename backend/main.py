@@ -272,7 +272,7 @@ def simulate_rainfall(simulation: RainfallSimulation) -> dict:
             "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
         ).fetchone()
         enriched = enrich_zone_with_multihazard_data(dict(updated))
-        if should_alert(zone["risk_level"], enriched["risk_level"]):
+        if should_alert(zone["id"], zone["risk_level"], enriched["risk_level"]):
             messages = build_messages(
                 enriched, enriched["risk_level"], enriched["risk_score"], zone["risk_score"]
             )

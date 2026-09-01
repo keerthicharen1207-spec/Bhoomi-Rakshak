@@ -28,7 +28,7 @@ type Zone = {
   rainfall_24h_norm: number;
   rainfall_7d_norm: number;
   risk_score: number;
-  risk_level: "Low" | "Medium" | "High" | "Severe";
+  risk_level: "Normal" | "Watch" | "Warning" | "Evacuate";
   physics?: PhysicsData;
   ml?: MLData;
 };
@@ -53,6 +53,11 @@ interface RiskMapProps {
 }
 
 const RISK_COLORS: Record<string, { stroke: string; fill: string }> = {
+  Normal: { stroke: "#578032", fill: "#a8d45f" },
+  Watch: { stroke: "#8a7629", fill: "#d7c75b" },
+  Warning: { stroke: "#a36c1e", fill: "#ecad4b" },
+  Evacuate: { stroke: "#9b3626", fill: "#df6651" },
+  // Backward compatibility fallbacks
   Low: { stroke: "#578032", fill: "#a8d45f" },
   Medium: { stroke: "#8a7629", fill: "#d7c75b" },
   High: { stroke: "#a36c1e", fill: "#ecad4b" },
@@ -143,7 +148,7 @@ export default function RiskMap({
     zonesLayer.clearLayers();
 
     zones.forEach((zone) => {
-      const colors = RISK_COLORS[zone.risk_level] || RISK_COLORS.Low;
+      const colors = RISK_COLORS[zone.risk_level] || RISK_COLORS.Normal || RISK_COLORS.Low;
       const isSelected = zone.id === selectedZoneId;
 
       const circle = L.circleMarker([zone.lat, zone.lng], {

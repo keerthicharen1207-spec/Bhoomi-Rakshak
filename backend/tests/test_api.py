@@ -12,7 +12,7 @@ def test_risk_scores_returns_seeded_zones(tmp_path, monkeypatch):
     assert response.status_code == 200
     zones = response.json()
     assert len(zones) == 14
-    assert {zone["risk_level"] for zone in zones} >= {"Low", "Medium"}
+    assert {zone["risk_level"] for zone in zones} >= {"Normal", "Watch"}
     assert all(0 <= zone["risk_score"] <= 100 for zone in zones)
 
 
@@ -30,7 +30,7 @@ def test_simulate_rainfall_updates_zone_risk(tmp_path, monkeypatch):
     assert updated["id"] == zone["id"]
     assert updated["rainfall_24h_norm"] == 1.0
     assert updated["risk_score"] > zone["risk_score"]
-    assert updated["risk_level"] in {"High", "Severe"}
+    assert updated["risk_level"] in {"Warning", "Evacuate"}
 
 
 def test_simulate_rainfall_persists_recomputed_zone(tmp_path, monkeypatch):
@@ -72,21 +72,23 @@ def test_alerts_feed_starts_empty(tmp_path, monkeypatch):
 
 
 def test_threshold_crossing_creates_exactly_one_alert(tmp_path, monkeypatch):
+    from backend.alerts import last_alert_time
+    last_alert_time.clear()
     database = tmp_path / "test.db"
     monkeypatch.setattr("backend.main.DATABASE_PATH", database)
     with TestClient(app) as client:
-        # Use Sohra district which starts at Medium and escalates to High on 200mm rainfall
+        # Use Sohra district which starts at Watch and escalates to Warning on 200mm rainfall
         zone = next(z for z in client.get("/risk-scores").json() if "Sohra" in z["name"])
         first = client.post(
             "/simulate-rainfall", json={"zone_id": zone["id"], "rainfall_mm": 200.0}
         ).json()
-        assert first["risk_level"] == "High"
+        assert first["risk_level"] == "Warning"
 
         alerts = client.get("/alerts").json()
         assert len(alerts) == 1
         assert alerts[0]["zone_id"] == zone["id"]
         assert alerts[0]["zone_name"] == zone["name"]
-        assert alerts[0]["level"] == "High"
+        assert alerts[0]["level"] == "Warning"
         assert set(alerts[0]["messages"]["community"]) == {"en", "as", "nl"}
 
         client.post("/simulate-rainfall", json={"zone_id": zone["id"], "rainfall_mm": 200.0})
@@ -94,18 +96,21 @@ def test_threshold_crossing_creates_exactly_one_alert(tmp_path, monkeypatch):
 
 
 def test_escalation_to_severe_adds_severe_alert_without_duplicates(tmp_path, monkeypatch):
+    from backend.alerts import last_alert_time
+    last_alert_time.clear()
     database = tmp_path / "test.db"
     monkeypatch.setattr("backend.main.DATABASE_PATH", database)
     with TestClient(app) as client:
         sohra = next(z for z in client.get("/risk-scores").json() if "Sohra" in z["name"])
         for _ in range(8):
+            last_alert_time.clear()  # simulate passing cooldown for escalating alert test
             response = client.post(
                 "/simulate-rainfall", json={"zone_id": sohra["id"], "rainfall_mm": 200.0}
             )
-        assert response.json()["risk_level"] == "Severe"
+        assert response.json()["risk_level"] == "Evacuate"
 
         alerts = client.get("/alerts").json()
-        assert [alert["level"] for alert in alerts] == ["Severe", "High"]
+        assert [alert["level"] for alert in alerts] == ["Evacuate", "Warning"]
 
         client.post("/simulate-rainfall", json={"zone_id": sohra["id"], "rainfall_mm": 200.0})
         assert len(client.get("/alerts").json()) == 2

@@ -7,12 +7,12 @@ def test_weighted_score_uses_all_inputs():
 
 
 def test_risk_level_boundaries():
-    assert risk_level(39.99) == "Low"
-    assert risk_level(40) == "Medium"
-    assert risk_level(69.99) == "Medium"
-    assert risk_level(70) == "High"
-    assert risk_level(84.99) == "High"
-    assert risk_level(85) == "Severe"
+    assert risk_level(39.99) == "Normal"
+    assert risk_level(40) == "Watch"
+    assert risk_level(69.99) == "Watch"
+    assert risk_level(70) == "Warning"
+    assert risk_level(84.99) == "Warning"
+    assert risk_level(85) == "Evacuate"
 
 
 def test_apply_rainfall_replaces_24h_and_rolls_7d():

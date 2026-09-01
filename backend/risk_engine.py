@@ -38,12 +38,12 @@ def calculate_risk_score(
 def risk_level(score: float) -> str:
     """Map a score to the public risk-level bands."""
     if score < 40:
-        return "Low"
+        return "Normal"
     if score < 70:
-        return "Medium"
+        return "Watch"
     if score < 85:
-        return "High"
-    return "Severe"
+        return "Warning"
+    return "Evacuate"
 
 
 def apply_rainfall(rainfall_mm: float, previous_7d_norm: float) -> tuple[float, float]:
@@ -168,7 +168,7 @@ def evaluate_multihazard_zone_risk(
         "flood": {
             "name": "Flash Flood & Inundation",
             "score": round(min(100.0, (flash_flood_q / 35.0) * 60.0 + (flood_depth_m / 3.0) * 40.0), 1),
-            "level": "Severe" if flood_depth_m > 2.0 else ("High" if flood_depth_m > 1.0 else ("Medium" if flood_depth_m > 0.4 else "Low")),
+            "level": "Evacuate" if flood_depth_m > 2.0 else ("Warning" if flood_depth_m > 1.0 else ("Watch" if flood_depth_m > 0.4 else "Normal")),
             "peak_discharge_m3s": flash_flood_q,
             "inundation_depth_m": flood_depth_m,
             "runoff_status": "Flash Inundation Warning" if flash_flood_q > 20.0 else ("Elevated Runoff" if flash_flood_q > 10.0 else "Normal Channel Flow"),
@@ -185,7 +185,7 @@ def evaluate_multihazard_zone_risk(
         "earthquake": {
             "name": "Seismic & Co-seismic Hazard",
             "score": seismic_info["coseismic_risk_score"],
-            "level": "Severe" if seismic_info["zone_code"] == "Zone V" else ("High" if seismic_info["zone_code"] == "Zone IV" else "Medium"),
+            "level": "Evacuate" if seismic_info["zone_code"] == "Zone V" else ("Warning" if seismic_info["zone_code"] == "Zone IV" else "Watch"),
             "zone": seismic_info["zone_code"],
             "zone_factor_z": seismic_info["zone_factor_z"],
             "category": seismic_info["category"],
@@ -195,7 +195,7 @@ def evaluate_multihazard_zone_risk(
         "storm": {
             "name": "Severe Storm & High Wind",
             "score": storm_info["storm_score"],
-            "level": "Severe" if storm_info["storm_score"] >= 75 else ("High" if storm_info["storm_score"] >= 55 else ("Medium" if storm_info["storm_score"] >= 30 else "Low")),
+            "level": "Evacuate" if storm_info["storm_score"] >= 75 else ("Warning" if storm_info["storm_score"] >= 55 else ("Watch" if storm_info["storm_score"] >= 30 else "Normal")),
             "category": storm_info["category"],
             "wind_kmh": storm_info["wind_kmh"],
             "rain_24h_mm": storm_info["rain_24h_mm"],

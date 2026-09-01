@@ -92,7 +92,7 @@ type Zone = {
   rainfall_24h_norm: number;
   rainfall_7d_norm: number;
   risk_score: number;
-  risk_level: "Low" | "Medium" | "High" | "Severe";
+  risk_level: "Normal" | "Watch" | "Warning" | "Evacuate";
   physics?: PhysicsData;
   ml?: MLData;
   disasters?: DisasterInfo;
@@ -109,7 +109,7 @@ type Alert = {
   zone_id: number;
   zone_name: string;
   zone_state: string;
-  level: "High" | "Severe";
+  level: "Warning" | "Evacuate" | "High" | "Severe";
   messages: AlertMessages;
   created_at: string;
 };
@@ -326,8 +326,8 @@ export default function Dashboard() {
     }
   }
 
-  const severeCount = allZones.filter((z) => z.risk_level === "Severe").length;
-  const highCount = allZones.filter((z) => z.risk_level === "High").length;
+  const evacuateCount = allZones.filter((z) => z.risk_level === "Evacuate" || (z.risk_level as string) === "Severe").length;
+  const warningCount = allZones.filter((z) => z.risk_level === "Warning" || (z.risk_level as string) === "High").length;
   const sliderPercent = (rainfallMm / RAINFALL_MAX_MM) * 100;
   const latestAlert = alerts[0] ?? null;
 
@@ -351,8 +351,8 @@ export default function Dashboard() {
       </section>
       <section className="summary">
         <div><span>DISTRICTS MONITORED</span><strong>{allZones.length || "—"}</strong></div>
-        <div><span>HIGH RISK</span><strong className="amber">{highCount || "—"}</strong></div>
-        <div><span>SEVERE RISK</span><strong className="red">{severeCount || "—"}</strong></div>
+        <div><span>WARNING TIER</span><strong className="amber">{warningCount || "—"}</strong></div>
+        <div><span>EVACUATE TIER</span><strong className="red">{evacuateCount || "—"}</strong></div>
         <div className="summary-note">Hybrid Physics (FS, Q, CBI, IS-1893) &amp;<br />ML (XGBoost, RandomForest, LightGBM).</div>
       </section>
 
@@ -401,10 +401,10 @@ export default function Dashboard() {
             <h2>District Risk Map</h2>
           </div>
           <div className="legend">
-            <span className="dot low" />LOW
-            <span className="dot medium" />MEDIUM
-            <span className="dot high" />HIGH
-            <span className="dot severe" />SEVERE
+            <span className="dot normal" />NORMAL
+            <span className="dot watch" />WATCH
+            <span className="dot warning" />WARNING
+            <span className="dot evacuate" />EVACUATE
             <span className="dot-report verified" />VERIFIED REPORT
             <span className="dot-report pending" />PENDING
           </div>
@@ -541,6 +541,40 @@ export default function Dashboard() {
                 CONDITION: <b>{selectedDistrict.live_weather?.weather_desc?.toUpperCase() ?? "CLOUDY"}</b>
               </span>
             </div>
+
+            {/* Explainable AI (XAI) Risk Driver Breakdown Banner */}
+            {(() => {
+              const slopeContrib = 0.30 * selectedDistrict.slope_angle_norm;
+              const rain24Contrib = 0.35 * selectedDistrict.rainfall_24h_norm;
+              const rain7dContrib = 0.20 * selectedDistrict.rainfall_7d_norm;
+              const histContrib = 0.15 * selectedDistrict.historical_density_norm;
+              const totalContrib = (slopeContrib + rain24Contrib + rain7dContrib + histContrib) || 1;
+              const slopePct = Math.round((slopeContrib / totalContrib) * 100);
+              const rain24Pct = Math.round((rain24Contrib / totalContrib) * 100);
+              const rain7dPct = Math.round((rain7dContrib / totalContrib) * 100);
+              const histPct = Math.max(0, 100 - slopePct - rain24Pct - rain7dPct);
+
+              return (
+                <div style={{ padding: "12px 32px", background: "#f8faf7", borderBottom: "1px solid var(--line)", display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap", fontSize: "11px", fontFamily: "'DM Mono', monospace" }}>
+                  <span style={{ background: "#182322", color: "#fff", fontWeight: 700, fontSize: "9px", padding: "3px 8px", borderRadius: "2px", letterSpacing: "1px" }}>🧠 XAI RISK DRIVERS</span>
+                  <span style={{ color: "#3f534e" }}>
+                    Terrain Slope (30% wt): <b style={{ color: "#182322" }}>{slopePct}%</b>
+                  </span>
+                  <span style={{ color: "#c8d4c5" }}>•</span>
+                  <span style={{ color: "#3f534e" }}>
+                    24h Rainfall (35% wt): <b style={{ color: "#182322" }}>{rain24Pct}%</b>
+                  </span>
+                  <span style={{ color: "#c8d4c5" }}>•</span>
+                  <span style={{ color: "#3f534e" }}>
+                    7d Antecedent Rain (20% wt): <b style={{ color: "#182322" }}>{rain7dPct}%</b>
+                  </span>
+                  <span style={{ color: "#c8d4c5" }}>•</span>
+                  <span style={{ color: "#3f534e" }}>
+                    Historical Density (15% wt): <b style={{ color: "#182322" }}>{histPct}%</b>
+                  </span>
+                </div>
+              );
+            })()}
 
             {/* 5 Multi-Hazard Disaster Spectrum Cards */}
             <div className="disaster-spectrum-section">
