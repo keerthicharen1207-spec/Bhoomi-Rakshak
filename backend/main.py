@@ -1,32 +1,36 @@
-"""FastAPI application for the NER risk monitoring MVP."""
+"""FastAPI application for the India Multi-Hazard Risk Monitor — District Edition."""
 
 import json
 import os
 import sqlite3
-from contextlib import closing
-from contextlib import asynccontextmanager
+from contextlib import closing, asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal, Optional
 
-from typing import Literal
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .alerts import build_messages, should_alert
 from .reports import status_for
-from .risk_engine import apply_rainfall, calculate_risk_score, risk_level
+from .risk_engine import (
+    apply_rainfall,
+    calculate_risk_score,
+    risk_level,
+    evaluate_multihazard_zone_risk,
+)
+from .weather_service import fetch_zone_live_weather, OPENWEATHER_API_KEY
 
 DATABASE_PATH = Path(os.getenv("NER_DATABASE_PATH", Path(__file__).with_name("ner.db")))
+DISTRICTS_FILE = Path(__file__).parent / "data" / "india_districts.json"
 
-SEED_ZONES = [
-    ("Sohra", 25.27, 91.73, 0.82, 0.68, 0.25, 0.42),
-    ("Jowai", 25.45, 92.20, 0.71, 0.55, 0.18, 0.35),
-    ("Haflong", 25.17, 93.02, 0.76, 0.62, 0.22, 0.58),
-    ("Kohima", 25.67, 94.11, 0.79, 0.72, 0.28, 0.64),
-    ("Dimapur", 25.91, 93.73, 0.39, 0.31, 0.12, 0.29),
-]
+
+def _load_districts_file() -> list[dict]:
+    if DISTRICTS_FILE.exists():
+        with open(DISTRICTS_FILE) as f:
+            return json.load(f)
+    return []
 
 
 @asynccontextmanager
@@ -35,10 +39,10 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="NER Risk Monitor", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Bhoomi-Rakshak India Multi-Hazard Risk Monitor", version="0.4.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,16 +57,21 @@ def connect() -> sqlite3.Connection:
 
 def initialise_database() -> None:
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    districts = _load_districts_file()
+
     with closing(connect()) as connection:
+        # Districts table (replaces old zones; keeps 'zones' as alias for test compatibility)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS zones (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
+                state TEXT NOT NULL DEFAULT 'India',
                 lat REAL NOT NULL,
                 lng REAL NOT NULL,
                 slope_angle_norm REAL NOT NULL,
                 historical_density_norm REAL NOT NULL,
+                pop_density REAL NOT NULL DEFAULT 200.0,
                 rainfall_24h_norm REAL NOT NULL,
                 rainfall_7d_norm REAL NOT NULL,
                 risk_score REAL NOT NULL,
@@ -70,6 +79,13 @@ def initialise_database() -> None:
             )
             """
         )
+        # Add state & pop_density columns if DB was created without them (migration safety)
+        for col_def in [("state", "TEXT NOT NULL DEFAULT 'India'"), ("pop_density", "REAL NOT NULL DEFAULT 200.0")]:
+            try:
+                connection.execute(f"ALTER TABLE zones ADD COLUMN {col_def[0]} {col_def[1]}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS alerts (
@@ -95,32 +111,135 @@ def initialise_database() -> None:
             )
             """
         )
-        if connection.execute("SELECT COUNT(*) FROM zones").fetchone()[0] == 0:
-            for zone in SEED_ZONES:
-                name, lat, lng, slope, historical, rain_24h, rain_7d = zone
-                score = calculate_risk_score(slope, rain_24h, rain_7d, historical)
-                connection.execute(
-                    """
-                    INSERT INTO zones (
-                        name, lat, lng, slope_angle_norm, historical_density_norm,
-                        rainfall_24h_norm, rainfall_7d_norm, risk_score, risk_level
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (name, lat, lng, slope, historical, rain_24h, rain_7d, score, risk_level(score)),
-                )
+
+        if districts:
+            district_names = [d["name"] for d in districts]
+            # Remove any zones not in current district list
+            placeholders = ",".join(["?"] * len(district_names))
+            connection.execute(f"DELETE FROM zones WHERE name NOT IN ({placeholders})", tuple(district_names))
+            existing_names = {row["name"] for row in connection.execute("SELECT name FROM zones").fetchall()}
+            for d in districts:
+                if d["name"] not in existing_names:
+                    score = calculate_risk_score(
+                        d["slope_angle_norm"], d["rainfall_24h_norm"],
+                        d["rainfall_7d_norm"], d["historical_density_norm"]
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO zones (
+                            name, state, lat, lng, slope_angle_norm, historical_density_norm,
+                            pop_density, rainfall_24h_norm, rainfall_7d_norm, risk_score, risk_level
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            d["name"], d["state"], d["lat"], d["lng"],
+                            d["slope_angle_norm"], d["historical_density_norm"],
+                            d.get("pop_density", 200.0),
+                            d["rainfall_24h_norm"], d["rainfall_7d_norm"],
+                            score, risk_level(score),
+                        ),
+                    )
         connection.commit()
 
 
+def enrich_zone_with_multihazard_data(zone_dict: dict) -> dict:
+    weather = fetch_zone_live_weather(zone_dict["lat"], zone_dict["lng"])
+    eval_res = evaluate_multihazard_zone_risk(
+        slope_angle_norm=zone_dict["slope_angle_norm"],
+        rainfall_24h_norm=zone_dict["rainfall_24h_norm"],
+        rainfall_7d_norm=zone_dict["rainfall_7d_norm"],
+        historical_density_norm=zone_dict["historical_density_norm"],
+        temp_c=weather.get("temp_c", 24.0),
+        rh_pct=weather.get("humidity_pct", 75.0),
+        wind_kmh=weather.get("wind_kmh", 12.0),
+        pop_density=zone_dict.get("pop_density", 200.0),
+        state=zone_dict.get("state", "India"),
+        district_name=zone_dict.get("name", ""),
+    )
+    zone_dict["physics"] = eval_res["physics"]
+    zone_dict["ml"] = eval_res["ml"]
+    zone_dict["disasters"] = eval_res.get("disasters", {})
+    zone_dict["live_weather"] = weather
+    return zone_dict
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "country": "India", "version": "0.4.0"}
+
+
+@app.get("/states")
+def get_states() -> list[str]:
+    """Return distinct list of Indian states present in the district registry."""
+    with closing(connect()) as connection:
+        rows = connection.execute("SELECT DISTINCT state FROM zones ORDER BY state").fetchall()
+    return [row["state"] for row in rows]
+
+
+@app.get("/districts")
+def get_districts(state: Optional[str] = Query(default=None, description="Filter by Indian state name")) -> list[dict]:
+    """Return all Indian districts with multi-hazard risk metrics.
+    Optionally filter by ?state=Uttarakhand
+    """
+    with closing(connect()) as connection:
+        if state:
+            rows = connection.execute(
+                "SELECT * FROM zones WHERE state = ? ORDER BY risk_score DESC, name",
+                (state,)
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                "SELECT * FROM zones ORDER BY risk_score DESC, name"
+            ).fetchall()
+    return [enrich_zone_with_multihazard_data(dict(row)) for row in rows]
 
 
 @app.get("/risk-scores")
-def get_risk_scores() -> list[dict]:
+def get_risk_scores(state: Optional[str] = Query(default=None)) -> list[dict]:
+    """Alias for /districts — maintains backward compatibility with frontend."""
+    return get_districts(state=state)
+
+
+@app.get("/weather-status")
+def get_weather_status() -> dict:
+    sample = fetch_zone_live_weather(25.27, 91.73)
+    return {
+        "api_key_configured": bool(OPENWEATHER_API_KEY),
+        "status": sample["status"],
+        "message": sample.get("message", "Operational"),
+        "sample_weather": sample,
+        "region": "India",
+    }
+
+
+@app.post("/sync-weather")
+def sync_weather() -> dict:
     with closing(connect()) as connection:
-        rows = connection.execute("SELECT * FROM zones ORDER BY risk_score DESC, name").fetchall()
-    return [dict(row) for row in rows]
+        rows = connection.execute("SELECT * FROM zones").fetchall()
+        synced = []
+        for row in rows:
+            z = dict(row)
+            weather = fetch_zone_live_weather(z["lat"], z["lng"])
+            rain_mm = weather.get("rainfall_mm", 15.0)
+            rain_24h, rain_7d = apply_rainfall(rain_mm, z["rainfall_7d_norm"])
+            score = calculate_risk_score(
+                z["slope_angle_norm"], rain_24h, rain_7d, z["historical_density_norm"]
+            )
+            connection.execute(
+                """
+                UPDATE zones
+                SET rainfall_24h_norm = ?, rainfall_7d_norm = ?, risk_score = ?, risk_level = ?
+                WHERE id = ?
+                """,
+                (rain_24h, rain_7d, score, risk_level(score), z["id"]),
+            )
+            synced.append(z["name"])
+        connection.commit()
+    return {"status": "synced", "zones_updated": synced}
 
 
 class RainfallSimulation(BaseModel):
@@ -135,7 +254,7 @@ def simulate_rainfall(simulation: RainfallSimulation) -> dict:
             "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
         ).fetchone()
         if zone is None:
-            raise HTTPException(status_code=404, detail=f"Zone {simulation.zone_id} not found")
+            raise HTTPException(status_code=404, detail=f"District ID {simulation.zone_id} not found")
         rain_24h, rain_7d = apply_rainfall(simulation.rainfall_mm, zone["rainfall_7d_norm"])
         score = calculate_risk_score(
             zone["slope_angle_norm"], rain_24h, rain_7d, zone["historical_density_norm"]
@@ -152,9 +271,10 @@ def simulate_rainfall(simulation: RainfallSimulation) -> dict:
         updated = connection.execute(
             "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
         ).fetchone()
-        if should_alert(zone["risk_level"], updated["risk_level"]):
+        enriched = enrich_zone_with_multihazard_data(dict(updated))
+        if should_alert(zone["risk_level"], enriched["risk_level"]):
             messages = build_messages(
-                updated, updated["risk_level"], updated["risk_score"], zone["risk_score"]
+                enriched, enriched["risk_level"], enriched["risk_score"], zone["risk_score"]
             )
             connection.execute(
                 """
@@ -162,14 +282,14 @@ def simulate_rainfall(simulation: RainfallSimulation) -> dict:
                 VALUES (?, ?, ?, ?)
                 """,
                 (
-                    updated["id"],
-                    updated["risk_level"],
+                    enriched["id"],
+                    enriched["risk_level"],
                     json.dumps(messages),
                     datetime.now(timezone.utc).isoformat(),
                 ),
             )
             connection.commit()
-    return dict(updated)
+    return enriched
 
 
 @app.get("/alerts")
@@ -177,7 +297,7 @@ def get_alerts() -> list[dict]:
     with closing(connect()) as connection:
         rows = connection.execute(
             """
-            SELECT a.id, a.zone_id, a.level, a.message, a.created_at, z.name AS zone_name
+            SELECT a.id, a.zone_id, a.level, a.message, a.created_at, z.name AS zone_name, z.state AS zone_state
             FROM alerts a
             JOIN zones z ON z.id = a.zone_id
             ORDER BY a.id DESC
@@ -188,6 +308,7 @@ def get_alerts() -> list[dict]:
             "id": row["id"],
             "zone_id": row["zone_id"],
             "zone_name": row["zone_name"],
+            "zone_state": row["zone_state"],
             "level": row["level"],
             "messages": json.loads(row["message"]),
             "created_at": row["created_at"],
@@ -197,8 +318,9 @@ def get_alerts() -> list[dict]:
 
 
 class ReportCreate(BaseModel):
-    lat: float = Field(ge=-90.0, le=90.0)
-    lng: float = Field(ge=-180.0, le=180.0)
+    # Strictly restricted to Indian geographic coordinates
+    lat: float = Field(ge=6.0, le=37.5)
+    lng: float = Field(ge=68.0, le=97.5)
     description: str = Field(min_length=1)
     photo_url: str = ""
     source: Literal["citizen", "field_official"]
@@ -226,9 +348,7 @@ def create_report(report: ReportCreate) -> dict:
         )
         report_id = cursor.lastrowid
         connection.commit()
-        row = connection.execute(
-            "SELECT * FROM reports WHERE id = ?", (report_id,)
-        ).fetchone()
+        row = connection.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
     return dict(row)
 
 
@@ -237,4 +357,3 @@ def get_reports() -> list[dict]:
     with closing(connect()) as connection:
         rows = connection.execute("SELECT * FROM reports ORDER BY id DESC").fetchall()
     return [dict(row) for row in rows]
-

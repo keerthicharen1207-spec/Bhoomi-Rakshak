@@ -5,3 +5,6 @@ backend/ner.db
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
+.env
+backend/models/
+backend/data/*.csv

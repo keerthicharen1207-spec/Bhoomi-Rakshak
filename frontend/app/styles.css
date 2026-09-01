@@ -18,4 +18,71 @@
 .leaflet-popup-content-wrapper{border-radius:2px!important;box-shadow:0 3px 14px rgba(24,35,34,0.15)!important;border:1px solid var(--line)}
 .leaflet-popup-content{margin:12px 14px!important;line-height:1.4!important}
 
+/* District Master Command Center */
+.district-summary-card{background:#fff;border:1px solid var(--line);position:relative;overflow:hidden;padding:0;box-shadow:0 4px 20px rgba(0,0,0,0.03)}
+.district-hero-bar{padding:28px 32px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);background:#fafcfa;flex-wrap:wrap;gap:20px}
+.district-title-group h2{font:600 clamp(24px,3.5vw,36px) 'Space Grotesk';margin:0 0 8px;letter-spacing:-1px}
+.district-meta-tags{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.state-badge{background:#e2eee0;color:#2d5e2c;font:700 10px 'DM Mono';padding:4px 8px;border-radius:3px;letter-spacing:.06em}
+.coord-badge{font:500 11px 'DM Mono';color:var(--muted)}
+.pop-badge{background:#edf2ed;color:#455955;font:600 10px 'DM Mono';padding:4px 8px;border-radius:3px}
+
+.district-score-display{display:flex;gap:20px;align-items:center}
+.score-box{text-align:right}
+.score-box .main-val{font:700 clamp(36px,5vw,52px)/1 'Space Grotesk';letter-spacing:-2px}
+.score-box .score-label{font:600 9px 'DM Mono';letter-spacing:1px;color:var(--muted);display:block;margin-top:4px}
+.risk-pill-large{font:700 12px 'DM Mono';letter-spacing:1px;padding:8px 14px;border-radius:4px;text-transform:uppercase}
+.risk-pill-large.low{background:#e8f4d6;color:#578032}
+.risk-pill-large.medium{background:#f7f1cf;color:#8a7629}
+.risk-pill-large.high{background:#fff0d9;color:#a36c1e}
+.risk-pill-large.severe{background:#fbe3de;color:#9b3626}
+
+.live-weather-banner{padding:14px 32px;background:#f3f7f2;border-bottom:1px solid var(--line);display:flex;gap:24px;align-items:center;flex-wrap:wrap;font:500 11px 'DM Mono'}
+.live-weather-banner .weather-tag{background:var(--ink);color:#fff;font-weight:700;font-size:9px;padding:3px 7px;border-radius:2px}
+.live-weather-banner .weather-item{display:flex;gap:6px;align-items:center;color:#3f534e}
+.live-weather-banner .weather-item b{color:var(--ink)}
+
+/* Multi-Disaster Spectrum Grid */
+.disaster-spectrum-section{padding:28px 32px}
+.spectrum-heading{font:600 12px 'DM Mono';letter-spacing:1px;color:var(--muted);margin-bottom:16px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.disaster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.disaster-card{background:#fafcfa;border:1px solid var(--line);border-top:3px solid var(--line);padding:18px;position:relative;border-radius:4px;display:flex;flex-direction:column;justify-content:space-between}
+.disaster-card.landslide{border-top-color:#a36c1e}
+.disaster-card.flood{border-top-color:#326e8a}
+.disaster-card.earthquake{border-top-color:#8a3232}
+.disaster-card.wildfire{border-top-color:#c85523}
+.disaster-card.storm{border-top-color:#50328a}
+
+.disaster-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.disaster-title{font:600 14px 'Space Grotesk';color:var(--ink);display:flex;align-items:center;gap:6px}
+.disaster-badge{font:700 9px 'DM Mono';padding:3px 6px;border-radius:2px;text-transform:uppercase}
+.disaster-badge.low{background:#e8f4d6;color:#578032}
+.disaster-badge.medium,.disaster-badge.moderate{background:#f7f1cf;color:#8a7629}
+.disaster-badge.high{background:#fff0d9;color:#a36c1e}
+.disaster-badge.severe,.disaster-badge.extreme{background:#fbe3de;color:#9b3626}
+
+.disaster-metrics{display:grid;gap:6px;font:500 11px 'DM Mono';color:#445752;margin:10px 0}
+.disaster-metric-row{display:flex;justify-content:space-between;align-items:center}
+.disaster-metric-row b{color:var(--ink)}
+.disaster-metric-row .highlight-alert{color:#9b3626;font-weight:700}
+.disaster-metric-row .highlight-ok{color:#578032;font-weight:700}
+
+.disaster-progress{height:5px;background:#e5ebe5;border-radius:3px;overflow:hidden;margin-top:4px}
+.disaster-progress-bar{height:100%;border-radius:3px;transition:width 0.3s ease}
+
+/* Dual Engine Detail View */
+.dual-engine-section{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:0 32px 28px}
+@media(max-width:850px){.dual-engine-section{grid-template-columns:1fr}}
+.engine-box{background:#f4f7f2;border:1px solid var(--line);border-radius:4px;padding:20px}
+.engine-box h4{font:700 11px 'DM Mono';letter-spacing:1px;color:#3b4e49;margin:0 0 14px;text-transform:uppercase;border-bottom:1px solid #dce4dd;padding-bottom:8px}
+.engine-table{width:100%;font:500 11px/1.8 'DM Mono';color:#3f534e}
+.engine-table tr td:last-child{text-align:right;font-weight:600;color:var(--ink)}
+
+/* Quick district bar */
+.district-quick-bar{display:flex;gap:6px;overflow-x:auto;padding:12px 0 16px;margin-bottom:12px;scrollbar-width:thin}
+.district-quick-pill{font:600 10px 'DM Mono';padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:20px;white-space:nowrap;cursor:pointer;color:#455955;transition:all 0.15s ease}
+.district-quick-pill:hover{border-color:var(--ink);color:var(--ink)}
+.district-quick-pill.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+
 

@@ -1,0 +1,156 @@
+[
+  {
+    "name": "East Khasi Hills (Sohra)",
+    "state": "Meghalaya",
+    "lat": 25.27,
+    "lng": 91.73,
+    "slope_angle_norm": 0.82,
+    "historical_density_norm": 0.68,
+    "pop_density": 292.0,
+    "rainfall_24h_norm": 0.25,
+    "rainfall_7d_norm": 0.42
+  },
+  {
+    "name": "West Jaintia Hills (Jowai)",
+    "state": "Meghalaya",
+    "lat": 25.45,
+    "lng": 92.20,
+    "slope_angle_norm": 0.71,
+    "historical_density_norm": 0.55,
+    "pop_density": 180.0,
+    "rainfall_24h_norm": 0.18,
+    "rainfall_7d_norm": 0.35
+  },
+  {
+    "name": "Dima Hasao (Haflong)",
+    "state": "Assam",
+    "lat": 25.17,
+    "lng": 93.02,
+    "slope_angle_norm": 0.76,
+    "historical_density_norm": 0.62,
+    "pop_density": 44.0,
+    "rainfall_24h_norm": 0.22,
+    "rainfall_7d_norm": 0.58
+  },
+  {
+    "name": "Kohima District",
+    "state": "Nagaland",
+    "lat": 25.67,
+    "lng": 94.11,
+    "slope_angle_norm": 0.79,
+    "historical_density_norm": 0.72,
+    "pop_density": 213.0,
+    "rainfall_24h_norm": 0.28,
+    "rainfall_7d_norm": 0.64
+  },
+  {
+    "name": "Dimapur District",
+    "state": "Nagaland",
+    "lat": 25.91,
+    "lng": 93.73,
+    "slope_angle_norm": 0.39,
+    "historical_density_norm": 0.31,
+    "pop_density": 410.0,
+    "rainfall_24h_norm": 0.12,
+    "rainfall_7d_norm": 0.29
+  },
+  {
+    "name": "Wayanad District",
+    "state": "Kerala",
+    "lat": 11.68,
+    "lng": 76.13,
+    "slope_angle_norm": 0.85,
+    "historical_density_norm": 0.75,
+    "pop_density": 383.0,
+    "rainfall_24h_norm": 0.32,
+    "rainfall_7d_norm": 0.50
+  },
+  {
+    "name": "Chamoli District",
+    "state": "Uttarakhand",
+    "lat": 30.41,
+    "lng": 79.33,
+    "slope_angle_norm": 0.88,
+    "historical_density_norm": 0.70,
+    "pop_density": 49.0,
+    "rainfall_24h_norm": 0.28,
+    "rainfall_7d_norm": 0.45
+  },
+  {
+    "name": "Shimla District",
+    "state": "Himachal Pradesh",
+    "lat": 31.10,
+    "lng": 77.17,
+    "slope_angle_norm": 0.80,
+    "historical_density_norm": 0.60,
+    "pop_density": 159.0,
+    "rainfall_24h_norm": 0.20,
+    "rainfall_7d_norm": 0.38
+  },
+  {
+    "name": "Darjeeling District",
+    "state": "West Bengal",
+    "lat": 27.04,
+    "lng": 88.26,
+    "slope_angle_norm": 0.84,
+    "historical_density_norm": 0.64,
+    "pop_density": 586.0,
+    "rainfall_24h_norm": 0.26,
+    "rainfall_7d_norm": 0.44
+  },
+  {
+    "name": "East Sikkim (Gangtok)",
+    "state": "Sikkim",
+    "lat": 27.33,
+    "lng": 88.61,
+    "slope_angle_norm": 0.84,
+    "historical_density_norm": 0.65,
+    "pop_density": 295.0,
+    "rainfall_24h_norm": 0.30,
+    "rainfall_7d_norm": 0.48
+  },
+  {
+    "name": "Papum Pare (Itanagar)",
+    "state": "Arunachal Pradesh",
+    "lat": 27.08,
+    "lng": 93.60,
+    "slope_angle_norm": 0.78,
+    "historical_density_norm": 0.58,
+    "pop_density": 105.0,
+    "rainfall_24h_norm": 0.22,
+    "rainfall_7d_norm": 0.40
+  },
+  {
+    "name": "Idukki District",
+    "state": "Kerala",
+    "lat": 9.85,
+    "lng": 76.97,
+    "slope_angle_norm": 0.83,
+    "historical_density_norm": 0.78,
+    "pop_density": 255.0,
+    "rainfall_24h_norm": 0.35,
+    "rainfall_7d_norm": 0.52
+  },
+  {
+    "name": "Mandi District",
+    "state": "Himachal Pradesh",
+    "lat": 31.71,
+    "lng": 76.93,
+    "slope_angle_norm": 0.81,
+    "historical_density_norm": 0.63,
+    "pop_density": 253.0,
+    "rainfall_24h_norm": 0.24,
+    "rainfall_7d_norm": 0.42
+  },
+  {
+    "name": "Rudraprayag District",
+    "state": "Uttarakhand",
+    "lat": 30.48,
+    "lng": 79.03,
+    "slope_angle_norm": 0.90,
+    "historical_density_norm": 0.82,
+    "pop_density": 120.0,
+    "rainfall_24h_norm": 0.30,
+    "rainfall_7d_norm": 0.49
+  }
+]
