@@ -2,6 +2,8 @@ __pycache__/
 *.py[cod]
 backend/ner.db
 .pytest_cache/
+.venv/
+backend/uploads/
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo

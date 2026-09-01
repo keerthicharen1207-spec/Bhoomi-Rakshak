@@ -36,32 +36,116 @@ This repository intentionally focuses on the demo and research features above. I
 - Dockerfile — backend container definition
 - frontend/Dockerfile — frontend container definition
 
-## Local setup
+## Local setup and run guide
 
-### Backend
+### Requirements
 
-1. Install dependencies:
-   ```bash
-   pip install -r backend/requirements.txt
-   ```
+- Python 3.10+
+- Node.js 18+
+- npm
+- Git
 
-2. Start the API:
-   ```bash
-   python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+### 1) Clone the repository
 
-### Frontend
+```bash
+git clone https://github.com/keerthicharen1207-spec/Bhoomi-Rakshak.git
+cd Bhoomi-Rakshak
+```
 
-1. Install dependencies:
-   ```bash
-   cd frontend
-   npm install
-   ```
+### 2) Create and activate a Python virtual environment
 
-2. Start the dashboard:
-   ```bash
-   npm run dev
-   ```
+#### Windows PowerShell
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+#### macOS / Linux
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3) Install backend dependencies
+
+From the project root:
+
+```bash
+pip install -r backend/requirements.txt
+pip install python-multipart
+```
+
+The `python-multipart` package is required because the app accepts uploaded report files and FastAPI form-data endpoints will fail without it.
+
+### 4) Start the backend API
+
+From the project root:
+
+```bash
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+This starts the API at:
+
+- http://localhost:8000
+- API docs: http://localhost:8000/docs
+- Health check: http://localhost:8000/health
+
+If the app starts correctly, you should see Uvicorn listening on port 8000.
+
+### 5) Start the frontend dashboard
+
+Open a second terminal window and run:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will start at:
+
+- http://localhost:3000
+
+If port 3000 is already in use, Next.js will usually select the next available port and print it in the terminal.
+
+### 6) Open the app in the browser
+
+Visit:
+
+- Frontend: http://localhost:3000
+- Backend docs: http://localhost:8000/docs
+
+### Troubleshooting
+
+#### Backend fails with "Form data requires python-multipart to be installed"
+
+Run:
+
+```bash
+pip install python-multipart
+```
+
+Then restart the backend.
+
+#### Backend fails during district loading or model inference
+
+Check that the project dependencies were installed successfully and that the backend dataset files are present under `backend/data/`. The app expects the generated CSV dataset files and model files to exist for the risk engine.
+
+#### Frontend does not open or shows blank data
+
+Ensure the backend is still running and the frontend can reach the API. The frontend is configured to call the local API on `http://localhost:8000`.
+
+#### Windows-specific startup note
+
+If PowerShell blocks activation, use the direct Python path instead of activation:
+
+```powershell
+cd "C:\path\to\Bhoomi-Rakshak"
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
 ## Environment
 

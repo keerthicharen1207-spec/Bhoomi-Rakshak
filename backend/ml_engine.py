@@ -52,7 +52,7 @@ def ensure_datasets_exist() -> None:
 
 def train_landslide_model() -> Dict[str, Any]:
     ensure_datasets_exist()
-    df = pd.read_csv(DATA_DIR / "landslide_susceptibility_dataset.csv")
+    df = pd.read_csv(DATA_DIR / "landslide_susceptibility_dataset.csv", on_bad_lines="skip")
 
     feature_cols = [
         "slope_deg",
@@ -85,7 +85,7 @@ def train_landslide_model() -> Dict[str, Any]:
 
 def train_flood_model() -> Dict[str, Any]:
     ensure_datasets_exist()
-    df = pd.read_csv(DATA_DIR / "flood_depth_dataset.csv")
+    df = pd.read_csv(DATA_DIR / "flood_depth_dataset.csv", on_bad_lines="skip")
 
     feature_cols = [
         "elevation_m",
@@ -111,7 +111,7 @@ def train_flood_model() -> Dict[str, Any]:
 
 def train_triage_model() -> Dict[str, Any]:
     ensure_datasets_exist()
-    df = pd.read_csv(DATA_DIR / "population_vulnerability_dataset.csv")
+    df = pd.read_csv(DATA_DIR / "population_vulnerability_dataset.csv", on_bad_lines="skip")
 
     feature_cols = [
         "pop_density_per_km2",
