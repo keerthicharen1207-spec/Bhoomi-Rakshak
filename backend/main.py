@@ -1,15 +1,18 @@
 """FastAPI application for the NER risk monitoring MVP."""
 
+import json
 import os
 import sqlite3
 from contextlib import closing
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .alerts import build_messages, should_alert
 from .risk_engine import apply_rainfall, calculate_risk_score, risk_level
 
 DATABASE_PATH = Path(os.getenv("NER_DATABASE_PATH", Path(__file__).with_name("ner.db")))
@@ -61,6 +64,17 @@ def initialise_database() -> None:
                 rainfall_7d_norm REAL NOT NULL,
                 risk_score REAL NOT NULL,
                 risk_level TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                zone_id INTEGER NOT NULL,
+                level TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL
             )
             """
         )
@@ -121,4 +135,45 @@ def simulate_rainfall(simulation: RainfallSimulation) -> dict:
         updated = connection.execute(
             "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
         ).fetchone()
+        if should_alert(zone["risk_level"], updated["risk_level"]):
+            messages = build_messages(
+                updated, updated["risk_level"], updated["risk_score"], zone["risk_score"]
+            )
+            connection.execute(
+                """
+                INSERT INTO alerts (zone_id, level, message, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    updated["id"],
+                    updated["risk_level"],
+                    json.dumps(messages),
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            connection.commit()
     return dict(updated)
+
+
+@app.get("/alerts")
+def get_alerts() -> list[dict]:
+    with closing(connect()) as connection:
+        rows = connection.execute(
+            """
+            SELECT a.id, a.zone_id, a.level, a.message, a.created_at, z.name AS zone_name
+            FROM alerts a
+            JOIN zones z ON z.id = a.zone_id
+            ORDER BY a.id DESC
+            """
+        ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "zone_id": row["zone_id"],
+            "zone_name": row["zone_name"],
+            "level": row["level"],
+            "messages": json.loads(row["message"]),
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]

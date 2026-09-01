@@ -13,6 +13,20 @@ type Zone = {
   risk_level: "Low" | "Medium" | "High" | "Severe";
 };
 
+type AlertMessages = {
+  authority: string;
+  community: { en: string; as: string; nl: string };
+};
+
+type Alert = {
+  id: number;
+  zone_id: number;
+  zone_name: string;
+  level: "High" | "Severe";
+  messages: AlertMessages;
+  created_at: string;
+};
+
 type SimulationResult = { text: string; level: string };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -25,11 +39,23 @@ const PRESETS = [
   { label: "200MM EXTREME", mm: 200 },
 ];
 
+const LANGUAGES = [
+  { code: "en", label: "ENGLISH" },
+  { code: "as", label: "অসমীয়া" },
+  { code: "nl", label: "NAGAMESE" },
+] as const;
+
+type LanguageCode = (typeof LANGUAGES)[number]["code"];
+
 function rainfallBand(mm: number): string {
   if (mm < 15) return "LIGHT";
   if (mm < 65) return "MODERATE";
   if (mm < 115) return "HEAVY";
   return "VERY HEAVY";
+}
+
+function alertTime(alert: Alert): string {
+  return new Date(alert.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function Dashboard() {
@@ -40,6 +66,8 @@ export default function Dashboard() {
   const [rainfallMm, setRainfallMm] = useState(60);
   const [simulating, setSimulating] = useState(false);
   const [result, setResult] = useState<SimulationResult | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [language, setLanguage] = useState<LanguageCode>("en");
 
   const loadZones = useCallback(async () => {
     try {
@@ -55,9 +83,20 @@ export default function Dashboard() {
     }
   }, []);
 
+  const loadAlerts = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/alerts`);
+      if (!response.ok) throw new Error("Alert feed unavailable");
+      setAlerts(await response.json());
+    } catch {
+      setAlerts([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadZones();
-  }, [loadZones]);
+    loadAlerts();
+  }, [loadZones, loadAlerts]);
 
   async function runSimulation() {
     if (selectedZoneId === null) return;
@@ -71,6 +110,7 @@ export default function Dashboard() {
       if (!response.ok) throw new Error("Simulation failed");
       const updated: Zone = await response.json();
       await loadZones();
+      await loadAlerts();
       setResult({
         text: `${updated.name.toUpperCase()} → ${updated.risk_level.toUpperCase()} · SCORE ${updated.risk_score.toFixed(1)}`,
         level: updated.risk_level.toLowerCase(),
@@ -85,6 +125,7 @@ export default function Dashboard() {
   const severeCount = zones.filter((zone) => zone.risk_level === "Severe").length;
   const highCount = zones.filter((zone) => zone.risk_level === "High").length;
   const sliderPercent = (rainfallMm / RAINFALL_MAX_MM) * 100;
+  const latestAlert = alerts[0] ?? null;
 
   return (
     <main>
@@ -103,6 +144,21 @@ export default function Dashboard() {
           {result && <p className={`sim-result ${result.level}`}>{result.text}</p>}
         </div>
         {error ? <div className="error">{error}</div> : <div className="zones">{zones.map((zone) => <article className={`zone-card ${zone.risk_level.toLowerCase()}`} key={zone.id}><div className={`risk-strip ${zone.risk_level.toLowerCase()}`} /><div className="zone-head"><div><h3>{zone.name}</h3><p>{zone.lat.toFixed(2)}°N / {zone.lng.toFixed(2)}°E</p></div><span className={`pill ${zone.risk_level.toLowerCase()}`}>{zone.risk_level}</span></div><div className="score"><strong>{zone.risk_score.toFixed(1)}</strong><span>/ 100 RISK SCORE</span></div><div className="rain"><span>24H RAINFALL PRESSURE <b>{Math.round(zone.rainfall_24h_norm * 100)}%</b></span><div className="meter"><i style={{ width: `${zone.rainfall_24h_norm * 100}%` }} /></div><span>7D BASELINE <b>{Math.round(zone.rainfall_7d_norm * 100)}%</b></span></div></article>)}</div>}
+      </section>
+      <section className="alerts">
+        <div className="section-heading"><div><p className="eyebrow">ALERT FEED</p><h2>Threshold crossings</h2></div><p className="sim-note">AUTO-GENERATED ON ESCALATION INTO HIGH / SEVERE</p></div>
+        <div className="alerts-layout">
+          <div className="alert-list">
+            {alerts.length === 0 ? <div className="alert-empty">NO ALERTS ISSUED — ALL ZONES BELOW THE WARNING THRESHOLD</div> : alerts.map((alert) => <article className={`alert-item ${alert.level.toLowerCase()}`} key={alert.id}><div className="alert-meta"><span className={`level-tag ${alert.level.toLowerCase()}`}>{alert.level.toUpperCase()}</span><span>{alert.zone_name.toUpperCase()}</span><span>{alertTime(alert)}</span></div><p>{alert.messages.authority}</p></article>)}
+          </div>
+          <div className="sms-mock">
+            <div className="sim-head"><p className="eyebrow">COMMUNITY SMS</p><p className="sim-note">MOCKED VIEW — NO REAL DELIVERY</p></div>
+            <div className="lang-toggle">{LANGUAGES.map((lang) => <button key={lang.code} type="button" className={language === lang.code ? "chip active" : "chip"} onClick={() => setLanguage(lang.code)}>{lang.label}</button>)}</div>
+            <div className="phone">
+              {latestAlert ? (<><p className="phone-to">TO: SUBSCRIBERS — {latestAlert.zone_name.toUpperCase()}</p><div className="phone-bubble">{latestAlert.messages.community[language]}</div><p className="phone-time">{alertTime(latestAlert)}</p></>) : <p className="phone-empty">NO ALERTS ISSUED</p>}
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   );
