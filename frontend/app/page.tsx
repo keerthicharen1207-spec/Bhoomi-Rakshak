@@ -227,6 +227,21 @@ export default function Dashboard() {
     }
   }, []);
 
+  const [syncingWeather, setSyncingWeather] = useState(false);
+
+  const syncWeather = async () => {
+    setSyncingWeather(true);
+    try {
+      await fetch(`${API_URL}/sync-live-weather`, { method: "POST" });
+      await loadZones();
+      await loadAlerts();
+    } catch {
+      // ignore
+    } finally {
+      setSyncingWeather(false);
+    }
+  };
+
   const loadReports = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/reports`);
@@ -434,7 +449,29 @@ export default function Dashboard() {
             CLEAR ×
           </button>
         )}
-        <span style={{ marginLeft: "auto", fontSize: "11px", color: "#71807c" }}>
+        <button
+          type="button"
+          onClick={syncWeather}
+          disabled={syncingWeather}
+          style={{
+            marginLeft: "auto",
+            fontSize: "11px",
+            fontWeight: 700,
+            fontFamily: "'DM Mono', monospace",
+            padding: "6px 14px",
+            background: syncingWeather ? "#c8d4c5" : "#182322",
+            color: "#fff",
+            border: "none",
+            borderRadius: "3px",
+            cursor: syncingWeather ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          {syncingWeather ? "🔄 SYNCING LIVE WEATHER…" : "🛰️ SYNC LIVE TELEMETRY"}
+        </button>
+        <span style={{ fontSize: "11px", color: "#71807c" }}>
           Showing <strong>{zones.length}</strong> of <strong>{allZones.length}</strong> districts
         </span>
       </section>

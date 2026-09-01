@@ -11,12 +11,27 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+from pathlib import Path
+
+def _load_api_key() -> str:
+    key = os.getenv("OPENWEATHER_API_KEY", "")
+    if not key:
+        for env_path in [Path(".env"), Path("backend/.env"), Path(__file__).parent / ".env", Path(__file__).parent.parent / ".env"]:
+            if env_path.exists():
+                for line in env_path.read_text().splitlines():
+                    if line.strip().startswith("OPENWEATHER_API_KEY="):
+                        key = line.strip().split("=", 1)[1].strip().strip('"').strip("'")
+                        if key:
+                            os.environ["OPENWEATHER_API_KEY"] = key
+                            return key
+    return key
+
+OPENWEATHER_API_KEY = _load_api_key()
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 
 def fetch_zone_live_weather(lat: float, lng: float, api_key: Optional[str] = None) -> Dict[str, Any]:
-    key = api_key or OPENWEATHER_API_KEY
+    key = api_key or _load_api_key()
     if not key:
         return {
             "status": "disabled",
@@ -36,10 +51,15 @@ def fetch_zone_live_weather(lat: float, lng: float, api_key: Optional[str] = Non
             wind = data.get("wind", {})
             rain = data.get("rain", {})
 
-            # Extract 1h rain or convert 3h rain to 24h estimation
-            rain_1h = rain.get("1h", 0.0)
-            rain_3h = rain.get("3h", 0.0)
-            rainfall_mm = rain_1h * 24.0 if rain_1h > 0 else (rain_3h * 8.0 if rain_3h > 0 else 15.0)
+            # Extract 1h rain or convert 3h rain to 24h estimation; 0.0 mm if no rain
+            rain_1h = float(rain.get("1h", 0.0))
+            rain_3h = float(rain.get("3h", 0.0))
+            if rain_1h > 0:
+                rainfall_mm = rain_1h * 24.0
+            elif rain_3h > 0:
+                rainfall_mm = rain_3h * 8.0
+            else:
+                rainfall_mm = 0.0
 
             return {
                 "status": "live",
