@@ -30,7 +30,22 @@ OPENWEATHER_API_KEY = _load_api_key()
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 
-def fetch_zone_live_weather(lat: float, lng: float, api_key: Optional[str] = None) -> Dict[str, Any]:
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+_WEATHER_CACHE: Dict[str, tuple[float, Dict[str, Any]]] = {}
+_CACHE_TTL_SECONDS = 600.0  # 10 minutes
+
+
+def fetch_zone_live_weather(lat: float, lng: float, api_key: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
+    cache_key = f"{round(lat, 2)}_{round(lng, 2)}"
+    now = time.time()
+    
+    if not force_refresh and cache_key in _WEATHER_CACHE:
+        cached_time, cached_val = _WEATHER_CACHE[cache_key]
+        if now - cached_time < _CACHE_TTL_SECONDS:
+            return dict(cached_val)
+
     key = api_key or _load_api_key()
     if not key:
         return {
@@ -44,7 +59,7 @@ def fetch_zone_live_weather(lat: float, lng: float, api_key: Optional[str] = Non
 
     url = f"{OPENWEATHER_BASE_URL}?lat={lat}&lon={lng}&appid={key}&units=metric"
     try:
-        response = httpx.get(url, timeout=6.0)
+        response = httpx.get(url, timeout=2.0)
         if response.status_code == 200:
             data = response.json()
             main = data.get("main", {})
@@ -61,7 +76,7 @@ def fetch_zone_live_weather(lat: float, lng: float, api_key: Optional[str] = Non
             else:
                 rainfall_mm = 0.0
 
-            return {
+            result = {
                 "status": "live",
                 "temp_c": float(main.get("temp", 24.0)),
                 "humidity_pct": float(main.get("humidity", 75.0)),
@@ -69,6 +84,8 @@ def fetch_zone_live_weather(lat: float, lng: float, api_key: Optional[str] = Non
                 "rainfall_mm": round(rainfall_mm, 1),
                 "weather_desc": data.get("weather", [{}])[0].get("description", "clear"),
             }
+            _WEATHER_CACHE[cache_key] = (now, result)
+            return result
         elif response.status_code == 401:
             return {
                 "status": "activating",

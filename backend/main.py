@@ -210,22 +210,28 @@ def get_states() -> list[str]:
     return [row["state"] for row in rows]
 
 
+from concurrent.futures import ThreadPoolExecutor
+
 @app.get("/districts")
-def get_districts(state: Optional[str] = Query(None, description="Filter districts by Indian state")) -> list[dict]:
-    """Return all 14 Indian districts enriched with live multi-hazard metrics and weather."""
+def get_districts(state: Optional[str] = None) -> list[dict]:
+    """Return all Indian districts enriched with live multi-hazard metrics and weather."""
     with closing(connect()) as connection:
-        if state:
+        if state and isinstance(state, str) and state != "ALL STATES":
             rows = connection.execute("SELECT * FROM zones WHERE state = ? ORDER BY name", (state,)).fetchall()
         else:
             rows = connection.execute("SELECT * FROM zones ORDER BY state, name").fetchall()
-    return [enrich_zone_with_multihazard_data(dict(row)) for row in rows]
+    zone_dicts = [dict(row) for row in rows]
+    with ThreadPoolExecutor(max_workers=18) as pool:
+        return list(pool.map(enrich_zone_with_multihazard_data, zone_dicts))
 
 
 @app.get("/risk-scores")
 def get_risk_scores() -> list[dict]:
     with closing(connect()) as connection:
         rows = connection.execute("SELECT * FROM zones ORDER BY id").fetchall()
-    return [enrich_zone_with_multihazard_data(dict(row)) for row in rows]
+    zone_dicts = [dict(row) for row in rows]
+    with ThreadPoolExecutor(max_workers=18) as pool:
+        return list(pool.map(enrich_zone_with_multihazard_data, zone_dicts))
 
 
 @app.post("/sync-live-weather")
