@@ -130,54 +130,6 @@ type SimulationResult = { text: string; level: string };
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const RAINFALL_MAX_MM = 300;
 
-const DISASTER_SCENARIOS = [
-  {
-    name: "⚡ M7.2 Himalayan Earthquake",
-    pga: 0.55,
-    rain: 15,
-    temp: 18,
-    humidity: 60,
-    wind: 20,
-    badge: "SEISMIC",
-  },
-  {
-    name: "🌊 Monsoon Cloudburst & Flood",
-    pga: 0.05,
-    rain: 240,
-    temp: 22,
-    humidity: 98,
-    wind: 65,
-    badge: "FLOOD",
-  },
-  {
-    name: "🔥 Extreme Heatwave Wildfire",
-    pga: 0.02,
-    rain: 0,
-    temp: 46,
-    humidity: 14,
-    wind: 55,
-    badge: "WILDFIRE",
-  },
-  {
-    name: "🌀 Super Cyclone Landfall",
-    pga: 0.05,
-    rain: 190,
-    temp: 26,
-    humidity: 95,
-    wind: 185,
-    badge: "STORM",
-  },
-  {
-    name: "🌿 Normal Baseline",
-    pga: 0.08,
-    rain: 10,
-    temp: 24,
-    humidity: 70,
-    wind: 15,
-    badge: "NORMAL",
-  },
-];
-
 const PRESETS = [
   { label: "10MM DRIZZLE", mm: 10 },
   { label: "60MM SHOWER", mm: 60 },
@@ -224,7 +176,6 @@ export default function Dashboard() {
   const [simTemp, setSimTemp] = useState(28);
   const [simHumidity, setSimHumidity] = useState(65);
   const [simWind, setSimWind] = useState(20);
-  const [activeScenarioName, setActiveScenarioName] = useState<string | null>(null);
   
   const [simulating, setSimulating] = useState(false);
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -401,22 +352,54 @@ export default function Dashboard() {
   return (
     <main>
       <header className="topbar">
-        <div className="brand-mark">NER<span>•</span></div>
+        <div className="brand-mark">
+          BHOOMI<span>•</span>RAKSHAK <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--muted)", letterSpacing: "0", verticalAlign: "middle" }}>2.0</span>
+        </div>
         <div className="topbar-meta">INDIA DISTRICT MULTI-HAZARD MONITOR <b>● LIVE</b></div>
       </header>
       <section className="hero">
-        <div>
-          <p className="eyebrow">ALL INDIA / DISTRICT-LEVEL FIELD VIEW</p>
-          <h1>Know the slope<br /><em>before it moves.</em></h1>
-          <p className="lede">Live multi-hazard monitoring across India covering Landslide, Flash Flood, Earthquake, Wildfire &amp; Storm risks with Physics equations &amp; ML models.</p>
+        <div style={{ maxWidth: "680px" }}>
+          <p className="eyebrow">ALL-INDIA DISTRICT RISK COMMAND</p>
+          <h1>Predict the cascade.<br /><em>Protect the nation.</em></h1>
+          <p className="lede">
+            Unified multi-hazard early warning &amp; impact intelligence forecasting Landslides, Flash Floods, Earthquakes, Wildfires, and Severe Storms across India.
+          </p>
         </div>
-        <div className="timestamp">LAST UPDATED<br /><strong>{updatedAt}</strong></div>
+        
+        {/* Highlighted Dual-Core Hybrid Physics & ML Box */}
+        <div style={{
+          background: "linear-gradient(135deg, #182322 0%, #253935 100%)",
+          border: "1px solid #3d554f",
+          borderRadius: "6px",
+          padding: "20px 24px",
+          color: "#fff",
+          boxShadow: "0 8px 24px rgba(24,35,34,0.12)",
+          maxWidth: "440px",
+          alignSelf: "center",
+          fontFamily: "'DM Mono', monospace",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+            <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "1.2px", color: "#a8d45f" }}>⚡ DUAL-CORE RISK INTELLIGENCE</span>
+            <span style={{ fontSize: "9px", color: "#a8d45f", background: "rgba(168,212,95,0.15)", padding: "2px 8px", borderRadius: "3px", fontWeight: 700 }}>ACTIVE</span>
+          </div>
+          <div style={{ fontSize: "12px", lineHeight: "1.7", color: "#edf2ee", fontWeight: 400 }}>
+            <div style={{ marginBottom: "6px" }}>
+              <b style={{ color: "#fff", fontWeight: 700 }}>🔬 Hybrid Physics:</b> FS (Infinite Slope), Rational Discharge Q, Chandler Burning Index (CBI), IS-1893 Seismic.
+            </div>
+            <div>
+              <b style={{ color: "#fff", fontWeight: 700 }}>🧠 ML Model Suite:</b> XGBoost (Landslide), RandomForest (Flood Inundation), LightGBM (Evacuation Triage).
+            </div>
+          </div>
+        </div>
       </section>
       <section className="summary">
         <div><span>DISTRICTS MONITORED</span><strong>{allZones.length || "—"}</strong></div>
         <div><span>WARNING TIER</span><strong className="amber">{warningCount || "—"}</strong></div>
         <div><span>EVACUATE TIER</span><strong className="red">{evacuateCount || "—"}</strong></div>
-        <div className="summary-note">Hybrid Physics (FS, Q, CBI, IS-1893) &amp;<br />ML (XGBoost, RandomForest, LightGBM).</div>
+        <div className="summary-note">
+          LIVE TELEMETRY &amp; MULTI-HAZARD SENSING<br />
+          OpenWeatherMap · USGS I-D · IS 1893 Seismic Zoning
+        </div>
       </section>
 
       {/* ── State Filter + Search Bar ── */}
@@ -492,70 +475,32 @@ export default function Dashboard() {
         </div>
 
         {/* Multi-Hazard Scenario Simulator */}
-        <div className="simulator" style={{ background: "#fff", border: "1px solid var(--line)", padding: "24px 28px", marginBottom: "26px", borderRadius: "2px" }}>
-          <div className="sim-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "18px", flexWrap: "wrap", gap: "10px" }}>
+        <div className="simulator" style={{ background: "#fff", border: "1px solid var(--line)", padding: "28px 32px", marginBottom: "28px", borderRadius: "4px" }}>
+          <div className="sim-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "22px", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid #e5ebe8", paddingBottom: "16px" }}>
             <div>
               <p className="eyebrow" style={{ margin: 0, color: "var(--ink)", fontWeight: 700 }}>🌪️ BHOOMI MULTI-HAZARD SCENARIO SIMULATOR</p>
-              <p style={{ margin: "4px 0 0", fontSize: "11px", fontFamily: "'DM Mono', monospace", color: "var(--muted)" }}>
-                Inject extreme weather, cloudbursts, seismic ruptures, or dry heatwaves to test district multi-hazard resilience in real-time.
+              <p style={{ margin: "4px 0 0", fontSize: "12px", fontFamily: "'DM Mono', monospace", color: "var(--muted)" }}>
+                Adjust multi-hazard variables to evaluate realtime physical Factor of Safety, runoff discharge, seismic strain, and ML inference.
               </p>
             </div>
-            <p className="sim-note" style={{ background: "#edf2ed", padding: "4px 8px", borderRadius: "2px", fontWeight: 700 }}>
-              PHYSICS &amp; ML HYBRID RE-EVALUATION
+            <p className="sim-note" style={{ background: "#edf2ed", padding: "4px 10px", borderRadius: "3px", fontWeight: 700, color: "#2d423e" }}>
+              HYBRID RE-EVALUATION
             </p>
           </div>
 
-          {/* Quick Scenario Presets */}
-          <div style={{ marginBottom: "20px" }}>
-            <span style={{ fontSize: "10px", fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--muted)", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
-              1-CLICK DISASTER SCENARIOS:
-            </span>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {DISASTER_SCENARIOS.map((sc) => {
-                const isActive = activeScenarioName === sc.name;
-                return (
-                  <button
-                    key={sc.name}
-                    type="button"
-                    onClick={() => {
-                      setActiveScenarioName(sc.name);
-                      setRainfallMm(sc.rain);
-                      setSimPga(sc.pga);
-                      setSimTemp(sc.temp);
-                      setSimHumidity(sc.humidity);
-                      setSimWind(sc.wind);
-                    }}
-                    style={{
-                      fontSize: "11px",
-                      fontFamily: "'DM Mono', monospace",
-                      fontWeight: 600,
-                      padding: "8px 14px",
-                      borderRadius: "3px",
-                      border: isActive ? "1px solid var(--ink)" : "1px solid var(--line)",
-                      background: isActive ? "var(--ink)" : "#fafcfa",
-                      color: isActive ? "#fff" : "var(--ink)",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    {sc.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Target District & Hazard Inputs Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "20px", alignItems: "flex-end" }}>
+          {/* Vertical Stack of Inputs (One below the other) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "18px", marginBottom: "24px" }}>
             
-            {/* District Selector */}
-            <label className="sim-field">
-              <span style={{ fontWeight: 700 }}>🎯 TARGET DISTRICT</span>
+            {/* 1. Target District Selector */}
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "16px", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--ink)", letterSpacing: "0.5px" }}>
+                🎯 TARGET DISTRICT:
+              </span>
               <select
                 value={selectedZoneId ?? allZones[0]?.id ?? ""}
                 onChange={(event) => setSelectedZoneId(Number(event.target.value))}
                 disabled={allZones.length === 0}
-                style={{ height: "38px" }}
+                style={{ fontSize: "12px", padding: "8px 12px", border: "1px solid var(--line)", borderRadius: "3px", background: "#fafcfa", color: "var(--ink)", fontFamily: "'DM Mono', monospace", cursor: "pointer", width: "100%", maxWidth: "420px" }}
               >
                 {allZones.map((zone) => (
                   <option key={zone.id} value={zone.id}>
@@ -563,13 +508,12 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            {/* 1. Rainfall Surge Slider */}
-            <label className="sim-field">
-              <span style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>🌧️ 24H RAINFALL</span>
-                <b style={{ color: "var(--ink)" }}>{rainfallMm} mm ({rainfallBand(rainfallMm)})</b>
+            {/* 2. 24h Rainfall Surge Slider */}
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr auto", gap: "16px", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--ink)", letterSpacing: "0.5px" }}>
+                🌧️ 24H RAINFALL SURGE:
               </span>
               <input
                 type="range"
@@ -577,21 +521,21 @@ export default function Dashboard() {
                 max={RAINFALL_MAX_MM}
                 step={5}
                 value={rainfallMm}
-                onChange={(e) => {
-                  setRainfallMm(Number(e.target.value));
-                  setActiveScenarioName(null);
-                }}
+                onChange={(e) => setRainfallMm(Number(e.target.value))}
                 style={{
                   background: `linear-gradient(to right, #182322 ${(rainfallMm / RAINFALL_MAX_MM) * 100}%, #edf1eb ${(rainfallMm / RAINFALL_MAX_MM) * 100}%)`,
+                  width: "100%",
                 }}
               />
-            </label>
+              <span style={{ minWidth: "130px", textAlign: "right", fontSize: "11px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--ink)" }}>
+                {rainfallMm} mm <span style={{ color: "var(--muted)", fontWeight: 500 }}>({rainfallBand(rainfallMm)})</span>
+              </span>
+            </div>
 
-            {/* 2. Seismic Ground Motion (PGA in g) */}
-            <label className="sim-field">
-              <span style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>⚡ SEISMIC SHAKE (PGA)</span>
-                <b style={{ color: "var(--ink)" }}>{simPga.toFixed(2)} g {simPga >= 0.4 ? "🔥 M7.5+" : simPga >= 0.25 ? "⚠️ High" : "Normal"}</b>
+            {/* 3. Seismic Ground Motion (PGA in g) Slider */}
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr auto", gap: "16px", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--ink)", letterSpacing: "0.5px" }}>
+                ⚡ SEISMIC SHAKE (PGA):
               </span>
               <input
                 type="range"
@@ -599,21 +543,21 @@ export default function Dashboard() {
                 max={0.80}
                 step={0.02}
                 value={simPga}
-                onChange={(e) => {
-                  setSimPga(Number(e.target.value));
-                  setActiveScenarioName(null);
-                }}
+                onChange={(e) => setSimPga(Number(e.target.value))}
                 style={{
                   background: `linear-gradient(to right, #182322 ${(simPga / 0.80) * 100}%, #edf1eb ${(simPga / 0.80) * 100}%)`,
+                  width: "100%",
                 }}
               />
-            </label>
+              <span style={{ minWidth: "130px", textAlign: "right", fontSize: "11px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--ink)" }}>
+                {simPga.toFixed(2)} g <span style={{ color: simPga >= 0.4 ? "#9b3626" : simPga >= 0.25 ? "#a36c1e" : "var(--muted)", fontWeight: 500 }}>({simPga >= 0.4 ? "M7.5+" : simPga >= 0.25 ? "High" : "Normal"})</span>
+              </span>
+            </div>
 
-            {/* 3. Ambient Temperature */}
-            <label className="sim-field">
-              <span style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>🌡️ TEMPERATURE</span>
-                <b style={{ color: "var(--ink)" }}>{simTemp} °C {simTemp >= 42 ? "🔥 Heatwave" : ""}</b>
+            {/* 4. Ambient Temperature Slider */}
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr auto", gap: "16px", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--ink)", letterSpacing: "0.5px" }}>
+                🌡️ AMBIENT TEMPERATURE:
               </span>
               <input
                 type="range"
@@ -621,21 +565,21 @@ export default function Dashboard() {
                 max={50}
                 step={1}
                 value={simTemp}
-                onChange={(e) => {
-                  setSimTemp(Number(e.target.value));
-                  setActiveScenarioName(null);
-                }}
+                onChange={(e) => setSimTemp(Number(e.target.value))}
                 style={{
                   background: `linear-gradient(to right, #182322 ${((simTemp - 10) / 40) * 100}%, #edf1eb ${((simTemp - 10) / 40) * 100}%)`,
+                  width: "100%",
                 }}
               />
-            </label>
+              <span style={{ minWidth: "130px", textAlign: "right", fontSize: "11px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--ink)" }}>
+                {simTemp} °C <span style={{ color: simTemp >= 42 ? "#9b3626" : "var(--muted)", fontWeight: 500 }}>({simTemp >= 42 ? "Heatwave" : "Normal"})</span>
+              </span>
+            </div>
 
-            {/* 4. Relative Humidity */}
-            <label className="sim-field">
-              <span style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>💧 RELATIVE HUMIDITY</span>
-                <b style={{ color: "var(--ink)" }}>{simHumidity} % {simHumidity <= 20 ? "⚠️ Bone Dry" : ""}</b>
+            {/* 5. Relative Humidity Slider */}
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr auto", gap: "16px", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--ink)", letterSpacing: "0.5px" }}>
+                💧 RELATIVE HUMIDITY:
               </span>
               <input
                 type="range"
@@ -643,21 +587,21 @@ export default function Dashboard() {
                 max={100}
                 step={1}
                 value={simHumidity}
-                onChange={(e) => {
-                  setSimHumidity(Number(e.target.value));
-                  setActiveScenarioName(null);
-                }}
+                onChange={(e) => setSimHumidity(Number(e.target.value))}
                 style={{
                   background: `linear-gradient(to right, #182322 ${((simHumidity - 10) / 90) * 100}%, #edf1eb ${((simHumidity - 10) / 90) * 100}%)`,
+                  width: "100%",
                 }}
               />
-            </label>
+              <span style={{ minWidth: "130px", textAlign: "right", fontSize: "11px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--ink)" }}>
+                {simHumidity} % <span style={{ color: simHumidity <= 20 ? "#9b3626" : "var(--muted)", fontWeight: 500 }}>({simHumidity <= 20 ? "Dry Fuel" : "Humid"})</span>
+              </span>
+            </div>
 
-            {/* 5. Wind Speed */}
-            <label className="sim-field">
-              <span style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>💨 CYCLONE WIND</span>
-                <b style={{ color: "var(--ink)" }}>{simWind} km/h {simWind >= 120 ? "🌀 Cyclone" : ""}</b>
+            {/* 6. Wind Speed Slider */}
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr auto", gap: "16px", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--ink)", letterSpacing: "0.5px" }}>
+                💨 CYCLONE / WIND GUST:
               </span>
               <input
                 type="range"
@@ -665,22 +609,23 @@ export default function Dashboard() {
                 max={220}
                 step={5}
                 value={simWind}
-                onChange={(e) => {
-                  setSimWind(Number(e.target.value));
-                  setActiveScenarioName(null);
-                }}
+                onChange={(e) => setSimWind(Number(e.target.value))}
                 style={{
                   background: `linear-gradient(to right, #182322 ${(simWind / 220) * 100}%, #edf1eb ${(simWind / 220) * 100}%)`,
+                  width: "100%",
                 }}
               />
-            </label>
+              <span style={{ minWidth: "130px", textAlign: "right", fontSize: "11px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--ink)" }}>
+                {simWind} km/h <span style={{ color: simWind >= 120 ? "#9b3626" : "var(--muted)", fontWeight: 500 }}>({simWind >= 120 ? "Cyclone" : "Breeze"})</span>
+              </span>
+            </div>
 
           </div>
 
           {/* Action Row */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: "16px", flexWrap: "wrap", gap: "12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: "18px", flexWrap: "wrap", gap: "12px" }}>
             <div style={{ fontSize: "11px", fontFamily: "'DM Mono', monospace", color: "var(--muted)" }}>
-              Active Inputs: <b>Rain: {rainfallMm}mm</b> · <b>PGA: {simPga.toFixed(2)}g</b> · <b>Temp: {simTemp}°C</b> · <b>RH: {simHumidity}%</b> · <b>Wind: {simWind}km/h</b>
+              Active Configuration: <b>Rain: {rainfallMm}mm</b> · <b>PGA: {simPga.toFixed(2)}g</b> · <b>Temp: {simTemp}°C</b> · <b>RH: {simHumidity}%</b> · <b>Wind: {simWind}km/h</b>
             </div>
             <button
               type="button"
