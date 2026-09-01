@@ -1,6 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
+
+const RiskMap = dynamic(() => import("./RiskMap"), {
+  ssr: false,
+  loading: () => <div className="map-placeholder">LOADING REGIONAL TERRAIN MAP…</div>,
+});
 
 type Zone = {
   id: number;
@@ -196,6 +202,32 @@ export default function Dashboard() {
       <header className="topbar"><div className="brand-mark">NER<span>•</span></div><div className="topbar-meta">EARLY WARNING NETWORK <b>● LIVE</b></div></header>
       <section className="hero"><div><p className="eyebrow">NORTHEAST REGION / FIELD VIEW</p><h1>Know the slope<br /><em>before it moves.</em></h1><p className="lede">A live picture of terrain pressure across monitored zones.</p></div><div className="timestamp">LAST UPDATED<br /><strong>{updatedAt}</strong></div></section>
       <section className="summary"><div><span>MONITORED ZONES</span><strong>{zones.length || "—"}</strong></div><div><span>HIGH RISK</span><strong className="amber">{highCount || "—"}</strong></div><div><span>SEVERE RISK</span><strong className="red">{severeCount || "—"}</strong></div><div className="summary-note">Rainfall data is simulated<br />for this demonstration.</div></section>
+      <section className="map-section">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">GEOSPATIAL SITUATION VIEW</p>
+            <h2>Regional Risk Map</h2>
+          </div>
+          <div className="legend">
+            <span className="dot low" />LOW
+            <span className="dot medium" />MEDIUM
+            <span className="dot high" />HIGH
+            <span className="dot severe" />SEVERE
+            <span className="dot-report verified" />VERIFIED REPORT
+            <span className="dot-report pending" />PENDING
+          </div>
+        </div>
+        <RiskMap
+          zones={zones}
+          reports={reports}
+          selectedZoneId={selectedZoneId}
+          onSelectZone={(id) => setSelectedZoneId(id)}
+          onLocationSelect={(lat, lng) => {
+            setReportLat(lat.toFixed(2));
+            setReportLng(lng.toFixed(2));
+          }}
+        />
+      </section>
       <section className="content"><div className="section-heading"><div><p className="eyebrow">RISK OVERVIEW</p><h2>Current zone conditions</h2></div><div className="legend"><span className="dot low" />LOW <span className="dot medium" />MEDIUM <span className="dot high" />HIGH <span className="dot severe" />SEVERE</div></div>
         <div className="simulator">
           <div className="sim-head"><p className="eyebrow">RAINFALL SIMULATOR</p><p className="sim-note">SIMULATED FEED — DRIVES THE RISK ENGINE DIRECTLY</p></div>
