@@ -1,4 +1,4 @@
-# NER Risk Monitor
+#Bhoomi-Rakshak
 
 Ticket 1 provides the first runnable vertical slice: seeded Northeast India monitoring zones, SQLite persistence, the weighted risk engine, and a dashboard consuming `GET /risk-scores`.
 
