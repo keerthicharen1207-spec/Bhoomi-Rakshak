@@ -46,6 +46,16 @@ COMMUNITY_TEMPLATES = {
 # Zone ID to last alert timestamp dict to implement cooldown
 last_alert_time = {}
 
+
+def language_for_zone(zone: dict) -> str:
+    """Choose the default language based on the district's state and recipient context."""
+    state = (zone.get("state") or "").lower()
+    if any(token in state for token in ["assam", "meghalaya", "tripura", "west bengal"]):
+        return "as"
+    if any(token in state for token in ["nagaland", "mizoram", "manipur"]):
+        return "nl"
+    return "en"
+
 def should_alert(zone_id: int, previous_level: str, current_level: str) -> bool:
     """Fire only when a zone escalates into the Warning or Evacuate band, with 15min cooldown."""
     if current_level not in ALERT_LEVELS:
@@ -65,9 +75,17 @@ def should_alert(zone_id: int, previous_level: str, current_level: str) -> bool:
     return True
 
 
+def _sms_code(zone_name: str, level: str) -> str:
+    """Create a compact, deterministic SMS signature for each district alert."""
+    seed = sum(ord(ch) for ch in zone_name.upper() if ch.isalnum())
+    return f"RAK-{level[:2].upper()}-{seed % 1000:03d}"
+
+
 def build_messages(zone, level: str, score: float, previous_score: float) -> dict:
-    """Return the authority rendering and per-language community renderings."""
+    """Return the authority rendering, multilingual community SMS, and a route-aware emergency signature."""
     road = ZONE_ROADS.get(zone["name"], "the highway")
+    route_action = "evacuate to the nearest safe shelter" if level == "Evacuate" else "avoid the slope corridor and move to a sheltered checkpoint"
+    default_language = language_for_zone(zone)
     community = {
         language: template.format(road=road, zone=zone["name"])
         for language, template in COMMUNITY_TEMPLATES[level].items()
@@ -82,4 +100,12 @@ def build_messages(zone, level: str, score: float, previous_score: float) -> dic
         f"historical incident density {zone['historical_density_norm'] * 100:.0f}%. "
         f"Recommended: deploy field inspection along {road}, notify the district EOC."
     )
-    return {"authority": authority, "community": community}
+    return {
+        "authority": authority,
+        "community": community,
+        "default_language": default_language,
+        "selected_language": default_language,
+        "sms_code": _sms_code(zone["name"], level),
+        "route": road,
+        "action": route_action,
+    }

@@ -102,6 +102,11 @@ type Zone = {
 type AlertMessages = {
   authority: string;
   community: { en: string; as: string; nl: string };
+  default_language?: LanguageCode;
+  selected_language?: LanguageCode;
+  sms_code?: string;
+  route?: string;
+  action?: string;
 };
 
 type Alert = {
@@ -187,9 +192,11 @@ export default function Dashboard() {
   const [reportLng, setReportLng] = useState("91.73");
   const [reportDescription, setReportDescription] = useState("");
   const [reportPhotoUrl, setReportPhotoUrl] = useState("");
+  const [reportFile, setReportFile] = useState<File | null>(null);
   const [reportSource, setReportSource] = useState<"citizen" | "field_official">("citizen");
   const [submittingReport, setSubmittingReport] = useState(false);
   const [reportResult, setReportResult] = useState<{ text: string; error?: boolean } | null>(null);
+  const [priorityQueue, setPriorityQueue] = useState<any[]>([]);
   const [activeDisaster, setActiveDisaster] = useState<"landslide" | "flood" | "earthquake" | "wildfire" | "storm">("landslide");
 
   const loadZones = useCallback(async () => {
@@ -252,6 +259,72 @@ export default function Dashboard() {
     }
   }, []);
 
+  const loadPriorityQueue = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/priority-queue`);
+      if (!response.ok) throw new Error("Priority queue unavailable");
+      setPriorityQueue(await response.json());
+    } catch {
+      setPriorityQueue([]);
+    }
+  }, []);
+
+  const fileToDataUrl = async (file: File): Promise<string> => {
+    if (!file) return "";
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const flushPendingReports = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const queueKey = "bhoomi-rakshak-report-queue";
+    const queued = JSON.parse(window.localStorage.getItem(queueKey) ?? "[]");
+    if (!queued.length) return;
+
+    const remaining: any[] = [];
+    for (const item of queued) {
+      try {
+        const formData = new FormData();
+        formData.append("lat", String(item.lat));
+        formData.append("lng", String(item.lng));
+        formData.append("description", item.description);
+        formData.append("source", item.source);
+        formData.append("idempotency_key", item.idempotency_key ?? `${Date.now()}-${Math.random()}`);
+        if (item.photo_url) formData.append("photo_url", item.photo_url);
+        if (item.file_data_url) {
+          const match = item.file_data_url.match(/^data:(.*?);base64,(.*)$/);
+          if (match) {
+            const mime = match[1];
+            const content = atob(match[2]);
+            const bytes = new Uint8Array(content.length);
+            for (let i = 0; i < content.length; i += 1) bytes[i] = content.charCodeAt(i);
+            const blob = new Blob([bytes], { type: mime });
+            formData.append("file", blob, item.file_name ?? "offline-upload");
+          }
+        }
+        const response = await fetch(`${API_URL}/reports`, { method: "POST", body: formData });
+        if (!response.ok) {
+          remaining.push(item);
+        }
+      } catch {
+        remaining.push(item);
+      }
+    }
+
+    if (remaining.length !== queued.length) {
+      window.localStorage.setItem(queueKey, JSON.stringify(remaining));
+    } else if (remaining.length > 0) {
+      window.localStorage.setItem(queueKey, JSON.stringify(remaining));
+    } else {
+      window.localStorage.removeItem(queueKey);
+    }
+    await loadReports();
+  }, [loadReports]);
+
   // Client-side filter: state + search
   useEffect(() => {
     let filtered = allZones;
@@ -274,13 +347,17 @@ export default function Dashboard() {
     loadStates();
     loadAlerts();
     loadReports();
+    loadPriorityQueue();
+    flushPendingReports();
     const interval = setInterval(() => {
       loadZones();
       loadAlerts();
       loadReports();
+      loadPriorityQueue();
+      flushPendingReports();
     }, 15000);
     return () => clearInterval(interval);
-  }, [loadZones, loadStates, loadAlerts, loadReports]);
+  }, [loadZones, loadStates, loadAlerts, loadReports, loadPriorityQueue, flushPendingReports]);
 
   const handleLocationSelect = useCallback((lat: number, lng: number) => {
     setReportLat(lat.toFixed(2));
@@ -329,27 +406,53 @@ export default function Dashboard() {
     setSubmittingReport(true);
     setReportResult(null);
     try {
+      const formData = new FormData();
+      const lat = parseFloat(reportLat);
+      const lng = parseFloat(reportLng);
+      const idempotencyKey = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      formData.append("lat", String(lat));
+      formData.append("lng", String(lng));
+      formData.append("description", reportDescription.trim());
+      formData.append("source", reportSource);
+      formData.append("idempotency_key", idempotencyKey);
+      if (reportPhotoUrl.trim()) {
+        formData.append("photo_url", reportPhotoUrl.trim());
+      }
+      if (reportFile) {
+        formData.append("file", reportFile);
+      }
+
       const response = await fetch(`${API_URL}/reports`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lat: parseFloat(reportLat),
-          lng: parseFloat(reportLng),
+        body: formData,
+      });
+      if (!response.ok) {
+        const queueKey = "bhoomi-rakshak-report-queue";
+        const queueItem = {
+          lat,
+          lng,
           description: reportDescription.trim(),
           photo_url: reportPhotoUrl.trim(),
           source: reportSource,
-        }),
-      });
-      if (!response.ok) throw new Error("Submission failed");
+          idempotency_key: idempotencyKey,
+          file_name: reportFile?.name ?? "",
+          file_data_url: reportFile ? await fileToDataUrl(reportFile) : "",
+        };
+        const existing = JSON.parse(window.localStorage.getItem(queueKey) ?? "[]");
+        window.localStorage.setItem(queueKey, JSON.stringify([...existing, queueItem]));
+        throw new Error("Network unavailable; report saved offline and will retry automatically.");
+      }
       const created: Report = await response.json();
       setReportDescription("");
       setReportPhotoUrl("");
+      setReportFile(null);
       await loadReports();
       setReportResult({
         text: `REPORT SUBMITTED · STATUS: ${created.status.toUpperCase()}`,
       });
-    } catch {
-      setReportResult({ text: "SUBMISSION FAILED", error: true });
+    } catch (error) {
+      const extra = error instanceof Error && error.message ? `: ${error.message}` : "";
+      setReportResult({ text: `SUBMISSION FAILED${extra}`, error: true });
     } finally {
       setSubmittingReport(false);
     }
@@ -359,6 +462,13 @@ export default function Dashboard() {
   const warningCount = allZones.filter((z) => z.risk_level === "Warning" || (z.risk_level as string) === "High").length;
   const sliderPercent = (rainfallMm / RAINFALL_MAX_MM) * 100;
   const latestAlert = alerts[0] ?? null;
+
+  useEffect(() => {
+    const preferredLanguage = latestAlert?.messages?.default_language ?? latestAlert?.messages?.selected_language ?? "en";
+    if (preferredLanguage && LANGUAGES.some((item) => item.code === preferredLanguage)) {
+      setLanguage(preferredLanguage);
+    }
+  }, [latestAlert?.id]);
 
   // Selected district for the full-fledged summary card
   const selectedDistrict: Zone | null =
@@ -414,6 +524,27 @@ export default function Dashboard() {
         <div className="summary-note">
           LIVE TELEMETRY &amp; MULTI-HAZARD SENSING<br />
           OpenWeatherMap · USGS I-D · IS 1893 Seismic Zoning
+        </div>
+      </section>
+
+      <section className="priority-panel" style={{ padding: "18px 40px 0" }}>
+        <div className="section-heading">
+          <div><p className="eyebrow">EMERGENCY PRIORITY</p><h2>Response queue</h2></div>
+          <p className="sim-note">RISK × POPULATION × ROAD BLOCKAGE / SHELTER DISTANCE</p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(215px, 1fr))", gap: "12px", marginTop: "12px" }}>
+          {priorityQueue.slice(0, 5).map((item) => (
+            <div key={item.zone_id} style={{ background: "#f7faf7", border: "1px solid var(--line)", borderRadius: "8px", padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong>{item.name}</strong>
+                <span className="level-tag warning">{item.priority_score.toFixed(1)}</span>
+              </div>
+              <div style={{ fontSize: "11px", color: "#4b5d59", display: "flex", justifyContent: "space-between" }}>
+                <span>{item.state}</span>
+                <span>{item.road_blocked_flag ? "ROAD BLOCKED" : "ROAD OPEN"}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -1183,8 +1314,17 @@ export default function Dashboard() {
             <div className="phone">
               {latestAlert ? (
                 <>
-                  <p className="phone-to">TO: SUBSCRIBERS — {latestAlert.zone_name.toUpperCase()}{latestAlert.zone_state ? ` · ${latestAlert.zone_state.toUpperCase()}` : ""}</p>
-                  <div className="phone-bubble">{latestAlert.messages.community[language]}</div>
+                  <div className="sms-header-row">
+                    <p className="phone-to">TO: SUBSCRIBERS — {latestAlert.zone_name.toUpperCase()}{latestAlert.zone_state ? ` · ${latestAlert.zone_state.toUpperCase()}` : ""}</p>
+                    <span className="sms-signature">{latestAlert.messages.sms_code ?? "RAK-ALERT"}</span>
+                  </div>
+                  <div className="phone-bubble">
+                    {latestAlert.messages.community[language] ?? latestAlert.messages.community[latestAlert.messages.default_language ?? "en"] ?? latestAlert.messages.community.en}
+                  </div>
+                  <div className="sms-meta-row">
+                    <span><b>ROUTE</b> {latestAlert.messages.route ?? "SAFE CORRIDOR"}</span>
+                    <span><b>ACTION</b> {latestAlert.messages.action ?? "MOVE TO SHELTER"}</span>
+                  </div>
                   <p className="phone-time">{alertTime(latestAlert)}</p>
                 </>
               ) : (
@@ -1233,9 +1373,20 @@ export default function Dashboard() {
                 <textarea rows={3} placeholder="Describe slope cracks, rockfalls, or water buildup..." value={reportDescription} onChange={(e) => setReportDescription(e.target.value)} required />
               </label>
               <label className="form-field">
+                <span>PHOTO / VIDEO FILE (OPTIONAL)</span>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.mp4,image/jpeg,image/png,video/mp4"
+                  onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              <label className="form-field">
                 <span>PHOTO URL (OPTIONAL)</span>
                 <input type="url" placeholder="https://..." value={reportPhotoUrl} onChange={(e) => setReportPhotoUrl(e.target.value)} />
               </label>
+              {reportFile && (
+                <p className="sim-note" style={{ marginTop: "-8px" }}>ATTACHED FILE: {reportFile.name}</p>
+              )}
               <button type="submit" className="run" disabled={submittingReport}>
                 {submittingReport ? "SUBMITTING..." : "SUBMIT REPORT →"}
               </button>
@@ -1261,7 +1412,14 @@ export default function Dashboard() {
                   <div className="report-submeta">
                     <span>{report.lat.toFixed(2)}°N / {report.lng.toFixed(2)}°E</span>
                     {report.photo_url && (
-                      <a href={report.photo_url} target="_blank" rel="noreferrer" className="photo-link">VIEW ATTACHED PHOTO ↗</a>
+                      <a
+                        href={report.photo_url.startsWith("http") ? report.photo_url : `${API_URL}${report.photo_url}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="photo-link"
+                      >
+                        VIEW ATTACHED MEDIA ↗
+                      </a>
                     )}
                   </div>
                 </article>

@@ -66,6 +66,27 @@ def risk_level(score: float) -> str:
     return "Evacuate"
 
 
+def _dynamic_weather_multiplier(
+    rain_24h_mm: float,
+    rh_pct: float,
+    temp_c: float,
+    wind_kmh: float,
+) -> float:
+    """Dry, sunny weather should not keep India in a warning state without precipitation.
+
+    A clear day with low rainfall, lower humidity, and mild-to-warm temperatures is treated as a
+    low-risk baseline instead of carrying the full wet-season hazard load.
+    """
+    if rh_pct > 60.0 or temp_c < 18.0 or temp_c > 42.0 or wind_kmh > 35.0:
+        return 1.0
+
+    humidity_relief = max(0.0, (40.0 - rh_pct) / 40.0)
+    temperature_relief = max(0.0, (35.0 - temp_c) / 15.0)
+    wind_relief = max(0.0, (20.0 - wind_kmh) / 20.0)
+    multiplier = 0.05 + 0.07 * humidity_relief + 0.06 * temperature_relief + 0.05 * wind_relief
+    return min(0.15, max(0.05, multiplier))
+
+
 def apply_rainfall(rainfall_mm: float, previous_7d_norm: float) -> tuple[float, float]:
     """Fold a new 24-hour rainfall observation into the zone's rainfall norms."""
     rain_24h = min(rainfall_mm / RAINFALL_24H_MAX_MM, 1.0)
@@ -89,6 +110,12 @@ def evaluate_multihazard_zone_risk(
     pga_g: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Perform hybrid Physics + Machine Learning multi-hazard evaluation for a zone across all disaster classes."""
+
+    # Dynamic weather calibration: a dry, sunny day in India should not carry the wet-season rainfall load.
+    # Use live conditions to attenuate rainfall norms when the atmosphere is clear and low-moisture.
+    if 18.0 <= temp_c <= 40.0 and rh_pct <= 60.0 and wind_kmh <= 25.0:
+        rainfall_24h_norm *= 0.35
+        rainfall_7d_norm *= 0.35
 
     # 1. Recompute basic weighted risk score
     weighted_score = calculate_risk_score(
@@ -164,26 +191,38 @@ def evaluate_multihazard_zone_risk(
     triage_info = predict_population_triage(ml_triage_features)
 
     # 4. Hybrid combined multi-hazard risk score
-    fs_risk_component = max(0.0, min(1.0, (2.0 - factor_of_safety) / 1.0)) * 100.0
+    # FS >= 1.5 is fully stable (0 risk), 1.0 <= FS < 1.5 is marginal, FS < 1.0 is failure
+    if factor_of_safety >= 1.5:
+        fs_risk_component = 0.0
+    elif factor_of_safety >= 1.0:
+        fs_risk_component = ((1.5 - factor_of_safety) / 0.5) * 50.0
+    else:
+        fs_risk_component = 50.0 + min(50.0, ((1.0 - factor_of_safety) / 0.5) * 50.0)
+
     ml_landslide_component = landslide_susceptibility * 100.0
 
-    landslide_score = (0.50 * weighted_score) + (0.25 * fs_risk_component) + (0.25 * ml_landslide_component)
+    # Under dry clear weather (0mm rain), dry mountain slopes stay in Normal (0-29) / low Watch (30-35)
+    # As live rain increases, score dynamically surges into Warning (50-74) and Evacuate (75+)
+    weather_multiplier = _dynamic_weather_multiplier(rain_24h_mm, rh_pct, temp_c, wind_kmh)
+    landslide_score = (0.50 * weighted_score) + (0.30 * fs_risk_component) + (0.20 * ml_landslide_component)
+    landslide_score *= weather_multiplier
     flood_score = min(100.0, (flash_flood_q / 35.0) * 60.0 + (flood_depth_m / 3.0) * 40.0)
-    wildfire_score = wildfire_cbi["cbi_score"]
+    flood_score *= weather_multiplier
+    wildfire_score = wildfire_cbi["cbi_score"] * weather_multiplier
     seismic_score = seismic_info["coseismic_risk_score"]
-    storm_score = storm_info["storm_score"]
+    storm_score = storm_info["storm_score"] * weather_multiplier
 
-    # Composite multi-hazard risk score incorporates any extreme localized hazards
+    # Composite multi-hazard risk score
     max_hazard_score = max(landslide_score, flood_score, wildfire_score, seismic_score, storm_score)
-    combined_score = round(max(landslide_score, (0.55 * max_hazard_score + 0.45 * landslide_score)), 2)
+    combined_score = round(max_hazard_score, 2)
     combined_level = risk_level(combined_score)
 
     # 5. Multi-Disaster Breakdown Suite
     disasters = {
         "landslide": {
             "name": "Landslide & Slope Collapse",
-            "score": combined_score,
-            "level": combined_level,
+            "score": round(landslide_score, 1),
+            "level": risk_level(landslide_score),
             "fs": factor_of_safety,
             "fs_status": "Unstable (Failure Expected)" if factor_of_safety < 1.0 else ("Marginal Stability" if factor_of_safety < 1.5 else "Stable Slope"),
             "probability_pct": round(landslide_susceptibility * 100),
@@ -192,17 +231,17 @@ def evaluate_multihazard_zone_risk(
         },
         "flood": {
             "name": "Flash Flood & Inundation",
-            "score": round(min(100.0, (flash_flood_q / 35.0) * 60.0 + (flood_depth_m / 3.0) * 40.0), 1),
-            "level": "Evacuate" if flood_depth_m > 2.0 else ("Warning" if flood_depth_m > 1.0 else ("Watch" if flood_depth_m > 0.4 else "Normal")),
+            "score": round(flood_score, 1),
+            "level": risk_level(flood_score),
             "peak_discharge_m3s": flash_flood_q,
             "inundation_depth_m": flood_depth_m,
             "runoff_status": "Flash Inundation Warning" if flash_flood_q > 20.0 else ("Elevated Runoff" if flash_flood_q > 10.0 else "Normal Channel Flow"),
         },
         "wildfire": {
             "name": "Wildfire & Forest Fire",
-            "score": wildfire_cbi["cbi_score"],
-            "level": wildfire_cbi["category"],
-            "cbi_score": wildfire_cbi["cbi_score"],
+            "score": round(wildfire_score, 1),
+            "level": risk_level(wildfire_score),
+            "cbi_score": round(wildfire_score, 1),
             "category": wildfire_cbi["category"],
             "rh_pct": rh_pct,
             "temp_c": temp_c,

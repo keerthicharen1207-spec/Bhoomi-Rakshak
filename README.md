@@ -1,140 +1,90 @@
-# 🛡️ Bhoomi-Rakshak 2.0
-### India Multi-Hazard Early Warning & AI Disaster Intelligence System
+# Bhoomi-Rakshak
 
-> *"Predict the cascade. Protect the nation."*
+Bhoomi-Rakshak is a prototype early-warning and monitoring dashboard for landslide and multi-hazard risk across vulnerable districts in India, with a particular focus on the North Eastern Region and other high-risk hill corridors.
 
-**Bhoomi-Rakshak 2.0** is an operational-grade, AI- and physics-powered multi-hazard early warning, risk forecasting, and disaster intelligence platform designed specifically for high-risk terrains across India — spanning the **Himalayan Belt**, **Western Ghats**, **Northeastern Hills**, and **Coastal Corridors**.
+This project combines district-level risk scoring, weather adaptation, alert generation, and field reporting into a single demo-ready platform for analysis, simulation, and operational planning.
 
----
+## What it does
 
-## 🌟 Key Highlights & Special Factors
+- Tracks multi-hazard district risk using a hybrid scoring model built from terrain, rainfall, historical density, and weather conditions.
+- Uses live weather data and a public IMD rainfall feed to adapt risk estimates to current conditions.
+- Displays district risk levels and hazard summaries via a dashboard UI.
+- Generates warning alerts with language-aware messaging templates.
+- Lets citizens and field officials submit incident reports with media attachments.
+- Includes a nearest-road geo-match and a response-priority queue based on risk, vulnerability, and road-block status.
+- Supports offline queuing for field reports when connectivity is weak or unavailable.
 
-What makes **Bhoomi-Rakshak 2.0** distinct from conventional hazard monitors:
+## Included features
 
-| Innovation | Description |
-|---|---|
-| **🔬 Dual-Core Hybrid Architecture** | Combines deterministic first-principles geotechnical physics with state-of-the-art ML classifiers to prevent model hallucination and capture physical soil-failure mechanics. |
-| **🌪️ 5-Hazard Threat Spectrum** | Simultaneously monitors **Landslides**, **Flash Floods**, **Earthquakes (Co-seismic)**, **Wildfires**, and **Severe Storms/Cyclones**. |
-| **🧠 Explainable AI (XAI) Breakdown** | Real-time percentage attribution for every risk score (Slope 30%, 24h Rain 35%, 7d Moisture 20%, Historical Susceptibility 15%) so commanders understand *why* an alert triggered. |
-| **🛣️ RoadShield Infrastructure Intelligence** | Directly maps forecasted slope and flood failures to critical **National Highways** (NH766, NH181, NH7, NH544, NH10, etc.) to safeguard supply lines and evacuation routes. |
-| **⏱️ 15-Minute Anti-Fatigue Cooldown** | Prevents alert fatigue among first responders by suppressing duplicate warnings for 900 seconds unless risk escalates. |
-| **🎯 What-If Multi-Hazard Simulator** | Allows disaster planners and NDRF command teams to inject extreme cloudbursts, M7+ seismic tremors, heatwaves, or cyclone gusts into any target district. |
-| **🌐 Trilingual Community Delivery** | Broadcasts alerts in English, Assamese, and Nagamese for regional field adoption. |
-| **👥 Rakshak Citizen & Field Crowdsourcing** | Ground incident reporting with auto-verification for field officials and pending triage for citizen submissions. |
+- Weather-driven risk calibration
+- IMD rainfall augmentation and ingestion contract
+- Risk heatmap surface generation
+- District severity dashboard with multi-hazard breakdown
+- Alert feed and multilingual community messaging templates
+- Field report uploads with validation and media retrieval
+- Idempotent report retries and offline queue support
+- Priority queue for emergency response ordering
 
----
+## Not included in this version
 
-## 🔬 Scientific & Mathematical Formulation
+This repository intentionally focuses on the demo and research features above. It does not include production-grade telecom delivery or cloud deployment setup.
 
-### 1. Landslide Mechanics (Physics + ML)
-- **Infinite Slope Factor of Safety ($FS$)**:
-  $$FS = \frac{c' + (\gamma - m\gamma_w) H \cos^2\alpha \tan\phi'}{\gamma H \sin\alpha \cos\alpha}$$
-  - $FS > 1.3$: Stable Slope | $1.0 \le FS \le 1.3$: Marginal Stability | $FS < 1.0$: Physical Slope Failure.
-- **USGS / IMD Intensity-Duration ($I-D$) Threshold Curve**:
-  $$I = 14.82 \cdot D^{-0.39}$$
-  Tracks whether 24-hour storm rainfall intensity breaches historical failure thresholds.
-- **XGBoost Susceptibility Classifier**: Evaluates slope angle, clay content, hydraulic conductivity ($K_{sat}$), and rainfall history.
+## Project structure
 
-### 2. Flash Flood & Runoff (Physics + ML)
-- **Rational Method Peak Runoff Discharge ($Q$)**:
-  $$Q = \frac{C \cdot I \cdot A}{360} \quad (\text{m}^3/\text{s})$$
-- **RandomForest Inundation Regressor**: Predicts expected water depth (meters) based on catchment runoff and terrain slope.
+- backend/ — FastAPI API, risk engine, weather integration, report handling, and alerts
+- frontend/ — Next.js dashboard UI
+- Dockerfile — backend container definition
+- frontend/Dockerfile — frontend container definition
 
-### 3. Wildfire & Dry Fuel Index
-- **Chandler Burning Index ($CBI$)**:
-  $$CBI = \frac{(110 - 1.373 \cdot RH) \cdot e^{0.0438 \cdot T}}{60} \cdot v$$
-  Integrates real-time ambient temperature ($T$), relative humidity ($RH$), and wind velocity ($v$).
+## Local setup
 
-### 4. Earthquake & Co-seismic Landslides
-- **BIS IS 1893:2016 Seismic Ground Motion**: Integrates Peak Ground Acceleration ($PGA$) and seismic zoning (Zone II to Zone V) to predict co-seismic landslides on steep slopes.
+### Backend
 
-### 5. Evacuation Triage
-- **LightGBM Population Classifier**: Prioritizes evacuation urgency based on population density ($D_{pop}$), vulnerable roads, and composite multi-hazard index.
-
----
-
-## 🗺️ Monitored Districts Matrix (18 High-Risk Districts)
-
-Bhoomi-Rakshak actively tracks 18 critical districts across 10 Indian states:
-
-| District | State | Key Hazard Profiles | Critical Highway |
-|---|---|---|---|
-| **Wayanad** | Kerala | Severe Landslides, Western Ghats Cloudbursts | **NH766** |
-| **Idukki** | Kerala | Mountain Inundation, Slope Instability | **NH85** |
-| **Malappuram** | Kerala | Hill Catchment Runoff, Dense Population | **NH966** |
-| **Thrissur** | Kerala | Athirapally Catchment, Cyclone Corridor | **NH544** |
-| **Nilgiris (Ooty)** | Tamil Nadu | Steepest South Indian Slopes, Landslides | **NH181** |
-| **Kanyakumari** | Tamil Nadu | Tri-Ocean Confluence, Coastal Storm Surge | **NH844** |
-| **Chamoli** | Uttarakhand | Glacial Lake Outbursts, Co-seismic Rockfalls | **NH7** |
-| **Rudraprayag** | Uttarakhand | Cloudbursts, Flash Floods, Kedarnath Route | **NH107** |
-| **Shimla** | Himachal Pradesh | Landslides, Soil Creep, Urban Hill Stress | **NH5** |
-| **Mandi** | Himachal Pradesh | Beas River Flooding, Slope Slumping | **NH3** |
-| **Darjeeling** | West Bengal | Tea Garden Slope Failures, Heavy Monsoons | **NH110** |
-| **East Sikkim (Gangtok)** | Sikkim | Teesta Catchment Floods, High Seismicity | **NH10** |
-| **East Khasi Hills (Sohra)** | Meghalaya | World's Highest Rainfall Zone, Flash Floods | **NH6** |
-| **West Jaintia Hills (Jowai)** | Meghalaya | Heavy Precipitation, Road Cutting Slides | **NH44** |
-| **Dima Hasao (Haflong)** | Assam | Barail Range Landslides, Rail Line Severance | **NH27** |
-| **Kohima** | Nagaland | Sinking Zones, Mudslides, NH Connectivity | **NH2** |
-| **Dimapur** | Nagaland | Plains Flooding, River Inundation | **NH29** |
-| **Papum Pare (Itanagar)** | Arunachal Pradesh | Foothill Slope Failures, Heavy Downpours | **NH415** |
-
----
-
-## 🛠️ Technology Stack
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      FRONTEND LAYER                         │
-│  Next.js 15 (App Router) • React 19 • TypeScript            │
-│  Leaflet & React-Leaflet • Lucide Icons • CSS3 Custom Props │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ REST / JSON (15s Polling)
-┌──────────────────────────────▼──────────────────────────────┐
-│                      BACKEND LAYER                          │
-│  FastAPI • Python 3.12 • Uvicorn (ASGI) • SQLite3           │
-│  NumPy • Pandas • Scikit-Learn • XGBoost • LightGBM • HTTPX │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Telemetry & Geodata
-┌──────────────────────────────▼──────────────────────────────┐
-│                   DATA & SENSOR FEEDS                       │
-│  OpenWeatherMap Live API • ISRO Bhuvan Landslide Inventory  │
-│  IMD Monsoon Data (1901-Present) • BIS IS-1893:2016 Seismic │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🚀 Getting Started & How to Run
-
-### 1. Prerequisites
-- **Python 3.10+** (Python 3.12 recommended)
-- **Node.js 18+** & `npm`
-- Git
-
----
-
-### 2. Backend Setup & Launch
-
-1. Open a terminal in the project root directory:
+1. Install dependencies:
    ```bash
-   # Install Python dependencies
    pip install -r backend/requirements.txt
    ```
 
-2. *(Optional)* Set your OpenWeather API Key for live global weather feeds:
-   ```powershell
-   # On Windows PowerShell:
-   $env:OPENWEATHER_API_KEY="your_api_key_here"
-
-   # On Linux / macOS / Bash:
-   export OPENWEATHER_API_KEY="your_api_key_here"
-   ```
-
-3. Launch the FastAPI server:
+2. Start the API:
    ```bash
-   # From workspace root:
-   python -m uvicorn backend.main:app --reload --port 8000
+   python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
    ```
+
+### Frontend
+
+1. Install dependencies:
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+2. Start the dashboard:
+   ```bash
+   npm run dev
+   ```
+
+## Environment
+
+The project uses a local environment file for keys and runtime configuration. Add values as needed for your local environment.
+
+## Validation
+
+The backend test suite is included and can be run with:
+
+```bash
+python -m pytest backend/tests -q
+```
+
+The frontend can be type-checked with:
+
+```bash
+cd frontend
+npx tsc --noEmit
+```
+
+## Scope note
+
+This is a working prototype for a landslide and multi-hazard monitoring system. It is designed for demonstration, simulation, and research-oriented assessment rather than full-scale production operations. backend.main:app --reload --port 8000   ```
    *The backend API will be live at `http://localhost:8000` (Docs at `http://localhost:8000/docs`).*
 
 ---

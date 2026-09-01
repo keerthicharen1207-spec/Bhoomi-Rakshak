@@ -79,8 +79,9 @@ def test_threshold_crossing_creates_exactly_one_alert(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.main.DATABASE_PATH", database)
     with TestClient(app) as client:
         zone = next(z for z in client.get("/risk-scores").json() if "Sohra" in z["name"])
+        # Use heavy rainfall (400mm) to reliably cross Warning under dynamic weather-driven calibration
         first = client.post(
-            "/simulate-rainfall", json={"zone_id": zone["id"], "rainfall_mm": 200.0}
+            "/simulate-rainfall", json={"zone_id": zone["id"], "rainfall_mm": 400.0}
         ).json()
         assert first["risk_level"] in {"Warning", "Evacuate"}
 
@@ -91,7 +92,7 @@ def test_threshold_crossing_creates_exactly_one_alert(tmp_path, monkeypatch):
         assert alerts[0]["level"] in {"Warning", "Evacuate"}
         assert set(alerts[0]["messages"]["community"]) == {"en", "as", "nl"}
 
-        client.post("/simulate-rainfall", json={"zone_id": zone["id"], "rainfall_mm": 200.0})
+        client.post("/simulate-rainfall", json={"zone_id": zone["id"], "rainfall_mm": 400.0})
         assert len(client.get("/alerts").json()) == 1
 
 
@@ -105,7 +106,7 @@ def test_escalation_to_severe_adds_severe_alert_without_duplicates(tmp_path, mon
         for _ in range(8):
             last_alert_time.clear()
             response = client.post(
-                "/simulate-rainfall", json={"zone_id": sohra["id"], "rainfall_mm": 200.0}
+                "/simulate-rainfall", json={"zone_id": sohra["id"], "rainfall_mm": 400.0}
             )
         assert response.json()["risk_level"] == "Evacuate"
 
@@ -188,3 +189,66 @@ def test_report_rejects_invalid_payloads(tmp_path, monkeypatch):
     assert bad_latitude.status_code == 422
     assert bad_source.status_code == 422
     assert empty_description.status_code == 422
+
+
+def test_report_uploads_media_and_serves_it(tmp_path, monkeypatch):
+    database = tmp_path / "test.db"
+    monkeypatch.setattr("backend.main.DATABASE_PATH", database)
+    with TestClient(app) as client:
+        response = client.post(
+            "/reports",
+            data={
+                "lat": "25.27",
+                "lng": "91.73",
+                "description": "Crack track uploaded from the field",
+                "source": "field_official",
+            },
+            files={"file": ("crack.jpg", b"fake-jpg-content", "image/jpeg")},
+        )
+
+    assert response.status_code == 200
+    report = response.json()
+    assert report["photo_url"].startswith("/reports/1/media/")
+    assert report["status"] == "verified"
+
+    with TestClient(app) as client:
+        media = client.get(report["photo_url"])
+
+    assert media.status_code == 200
+    assert media.content == b"fake-jpg-content"
+
+
+def test_report_idempotency_key_prevents_duplicates(tmp_path, monkeypatch):
+    database = tmp_path / "test.db"
+    monkeypatch.setattr("backend.main.DATABASE_PATH", database)
+    with TestClient(app) as client:
+        payload = {
+            "lat": 25.27,
+            "lng": 91.73,
+            "description": "Repeatable report",
+            "photo_url": "",
+            "source": "citizen",
+            "idempotency_key": "op-123",
+        }
+        first = client.post("/reports", json=payload)
+        second = client.post("/reports", json=payload)
+        reports = client.get("/reports").json()
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]
+    assert len(reports) == 1
+
+
+def test_priority_queue_and_heatmap_endpoints_work(tmp_path, monkeypatch):
+    database = tmp_path / "test.db"
+    monkeypatch.setattr("backend.main.DATABASE_PATH", database)
+    with TestClient(app) as client:
+        queue = client.get("/priority-queue")
+        heatmap = client.get("/risk-heatmap")
+
+    assert queue.status_code == 200
+    assert heatmap.status_code == 200
+    assert len(queue.json()) > 0
+    assert len(heatmap.json()["cells"]) > 0
+    assert queue.json()[0]["priority_score"] >= queue.json()[-1]["priority_score"]

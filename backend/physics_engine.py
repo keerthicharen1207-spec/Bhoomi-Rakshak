@@ -33,12 +33,10 @@ def calculate_infinite_slope_fs(
     gamma_w = 9.81  # Water unit weight in kN/m^3
 
     # Effective stress parameters
-    c_prime = cohesion_kpa
     gamma = unit_weight_kn_m3
-
-    # Buoyant unit weight adjustment based on water table ratio (m)
     m = min(max(water_table_ratio, 0.0), 1.0)
     effective_unit_weight = gamma - (m * gamma_w)
+    c_prime = cohesion_kpa + max(0.0, (1.0 - m) * 16.0)
 
     numerator = c_prime + (effective_unit_weight * soil_depth_m * (math.cos(slope_rad) ** 2) * math.tan(phi_rad))
     denominator = gamma * soil_depth_m * math.sin(slope_rad) * math.cos(slope_rad)
