@@ -474,6 +474,58 @@ export default function Dashboard() {
           <p className="sim-note">SELECT ANY DISTRICT TO INSPECT ITS COMPLETE MULTI-DISASTER PROFILE</p>
         </div>
 
+        {/* Standard 4-Tier Operational Response Matrix Reference */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "12px",
+          marginBottom: "24px",
+        }}>
+          {/* Normal */}
+          <div style={{ background: "#fff", border: "1px solid #d0dfc8", borderTop: "4px solid #578032", padding: "14px 16px", borderRadius: "3px", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#578032", fontFamily: "'DM Mono', monospace" }}>🟢 NORMAL</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, background: "#edf7ed", color: "#578032", padding: "2px 6px", borderRadius: "2px", fontFamily: "'DM Mono', monospace" }}>SCORE 0–29</span>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#465551", lineHeight: "1.5" }}>
+              <b>Action:</b> Routine automated monitoring. Weather &amp; slope telemetry within normal physical limits.
+            </p>
+          </div>
+
+          {/* Watch */}
+          <div style={{ background: "#fff", border: "1px solid #e8e0be", borderTop: "4px solid #8a7629", padding: "14px 16px", borderRadius: "3px", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#8a7629", fontFamily: "'DM Mono', monospace" }}>🟡 WATCH</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, background: "#fefbe8", color: "#8a7629", padding: "2px 6px", borderRadius: "2px", fontFamily: "'DM Mono', monospace" }}>SCORE 30–49</span>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#465551", lineHeight: "1.5" }}>
+              <b>Action:</b> Pre-alert village panchayats &amp; field staff. Pre-position emergency relief shelters.
+            </p>
+          </div>
+
+          {/* Warning */}
+          <div style={{ background: "#fff", border: "1px solid #f3d4af", borderTop: "4px solid #a36c1e", padding: "14px 16px", borderRadius: "3px", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#a36c1e", fontFamily: "'DM Mono', monospace" }}>🟠 WARNING</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, background: "#fef3e2", color: "#a36c1e", padding: "2px 6px", borderRadius: "2px", fontFamily: "'DM Mono', monospace" }}>SCORE 50–74</span>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#465551", lineHeight: "1.5" }}>
+              <b>Action:</b> Restrict mountain highway transit. Mobilize NDRF/SDRF units &amp; prepare evacuation routes.
+            </p>
+          </div>
+
+          {/* Evacuate */}
+          <div style={{ background: "#fff", border: "1px solid #f8c8c4", borderTop: "4px solid #9b3626", padding: "14px 16px", borderRadius: "3px", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#9b3626", fontFamily: "'DM Mono', monospace" }}>🔴 EVACUATE</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, background: "#fde8e8", color: "#9b3626", padding: "2px 6px", borderRadius: "2px", fontFamily: "'DM Mono', monospace" }}>SCORE 75–100</span>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#465551", lineHeight: "1.5" }}>
+              <b>Action:</b> Sound sirens, send emergency multilingual SMS/IVR, and execute immediate civilian evacuation.
+            </p>
+          </div>
+        </div>
+
         {/* Multi-Hazard Scenario Simulator */}
         <div className="simulator" style={{ background: "#fff", border: "1px solid var(--line)", padding: "28px 32px", marginBottom: "28px", borderRadius: "4px" }}>
           <div className="sim-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "22px", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid #e5ebe8", paddingBottom: "16px" }}>
@@ -727,6 +779,50 @@ export default function Dashboard() {
                 </div>
               );
             })()}
+
+            {/* Dynamic Standard Operating Protocol / Action Directive Banner */}
+            <div style={{
+              padding: "14px 32px",
+              background:
+                selectedDistrict.risk_level === "Evacuate"
+                  ? "#fde8e8"
+                  : selectedDistrict.risk_level === "Warning"
+                  ? "#fef3e2"
+                  : selectedDistrict.risk_level === "Watch"
+                  ? "#fefbe8"
+                  : "#edf7ed",
+              borderBottom: "1px solid var(--line)",
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              flexWrap: "wrap",
+            }}>
+              <span style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                fontFamily: "'DM Mono', monospace",
+                padding: "4px 10px",
+                borderRadius: "3px",
+                background:
+                  selectedDistrict.risk_level === "Evacuate"
+                    ? "#9b3626"
+                    : selectedDistrict.risk_level === "Warning"
+                    ? "#a36c1e"
+                    : selectedDistrict.risk_level === "Watch"
+                    ? "#8a7629"
+                    : "#578032",
+                color: "#fff",
+                letterSpacing: "0.8px",
+              }}>
+                📋 REQUIRED ACTION ({selectedDistrict.risk_level.toUpperCase()})
+              </span>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#182322", fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
+                {selectedDistrict.risk_level === "Evacuate" && "🚨 CRITICAL IMMINENT DANGER (75–100): Sound acoustic sirens, trigger emergency multilingual SMS/IVR broadcast, restrict highway access, and initiate mandatory civilian evacuation to relief shelters."}
+                {selectedDistrict.risk_level === "Warning" && "⚠️ HIGH THREAT ALERT (50–74): Restrict civilian vehicular traffic on mountain highways, pre-deploy NDRF/SDRF rescue teams, open relief centers, and alert vulnerable hillside habitations."}
+                {selectedDistrict.risk_level === "Watch" && "🟡 ELEVATED VIGILANCE (30–49): Soil saturation and ground motion rising. Alert village panchayats, place rapid response teams on standby, and monitor slope drainage."}
+                {selectedDistrict.risk_level === "Normal" && "🟢 ROUTINE MONITORING (0–29): Terrain and meteorological parameters within safe limits. Continue automated 15-second satellite telemetry & weather scanning."}
+              </span>
+            </div>
 
             {/* 5 Multi-Hazard Disaster Spectrum Cards */}
             <div className="disaster-spectrum-section">
