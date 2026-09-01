@@ -27,6 +27,17 @@ type Alert = {
   created_at: string;
 };
 
+type Report = {
+  id: number;
+  lat: number;
+  lng: number;
+  description: string;
+  photo_url: string;
+  source: "citizen" | "field_official";
+  status: "pending" | "verified";
+  created_at: string;
+};
+
 type SimulationResult = { text: string; level: string };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -58,6 +69,10 @@ function alertTime(alert: Alert): string {
   return new Date(alert.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function reportTime(report: Report): string {
+  return new Date(report.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function Dashboard() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +83,15 @@ export default function Dashboard() {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [language, setLanguage] = useState<LanguageCode>("en");
+
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportLat, setReportLat] = useState("25.27");
+  const [reportLng, setReportLng] = useState("91.73");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportPhotoUrl, setReportPhotoUrl] = useState("");
+  const [reportSource, setReportSource] = useState<"citizen" | "field_official">("citizen");
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [reportResult, setReportResult] = useState<{ text: string; error?: boolean } | null>(null);
 
   const loadZones = useCallback(async () => {
     try {
@@ -93,10 +117,50 @@ export default function Dashboard() {
     }
   }, []);
 
+  const loadReports = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/reports`);
+      if (!response.ok) throw new Error("Reports feed unavailable");
+      setReports(await response.json());
+    } catch {
+      setReports([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadZones();
     loadAlerts();
-  }, [loadZones, loadAlerts]);
+    loadReports();
+  }, [loadZones, loadAlerts, loadReports]);
+
+  async function submitReport(event: React.FormEvent) {
+    event.preventDefault();
+    if (!reportDescription.trim()) return;
+    setSubmittingReport(true);
+    setReportResult(null);
+    try {
+      const response = await fetch(`${API_URL}/reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: parseFloat(reportLat) || 0,
+          lng: parseFloat(reportLng) || 0,
+          description: reportDescription.trim(),
+          photo_url: reportPhotoUrl.trim(),
+          source: reportSource,
+        }),
+      });
+      if (!response.ok) throw new Error("Submission failed");
+      setReportDescription("");
+      setReportPhotoUrl("");
+      setReportResult({ text: "INCIDENT REPORT RECORDED SUCCESSFULLY" });
+      await loadReports();
+    } catch {
+      setReportResult({ text: "FAILED TO SUBMIT REPORT — CHECK BACKEND SERVICE", error: true });
+    } finally {
+      setSubmittingReport(false);
+    }
+  }
 
   async function runSimulation() {
     if (selectedZoneId === null) return;
@@ -157,6 +221,111 @@ export default function Dashboard() {
             <div className="phone">
               {latestAlert ? (<><p className="phone-to">TO: SUBSCRIBERS — {latestAlert.zone_name.toUpperCase()}</p><div className="phone-bubble">{latestAlert.messages.community[language]}</div><p className="phone-time">{alertTime(latestAlert)}</p></>) : <p className="phone-empty">NO ALERTS ISSUED</p>}
             </div>
+          </div>
+        </div>
+      </section>
+      <section className="reports">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">FIELD REPORTS</p>
+            <h2>Crowdsourced observations</h2>
+          </div>
+          <p className="sim-note">COMMUNITY &amp; FIELD OFFICIAL GROUND TRUTH</p>
+        </div>
+        <div className="reports-layout">
+          <form className="report-form" onSubmit={submitReport}>
+            <div className="sim-head">
+              <p className="eyebrow">SUBMIT INCIDENT REPORT</p>
+              <p className="sim-note">AUTO-VERIFIED FOR OFFICIALS</p>
+            </div>
+            <div className="report-fields">
+              <label className="form-field">
+                <span>REPORTER SOURCE</span>
+                <select
+                  value={reportSource}
+                  onChange={(e) => setReportSource(e.target.value as "citizen" | "field_official")}
+                >
+                  <option value="citizen">CITIZEN (PENDING VERIFICATION)</option>
+                  <option value="field_official">FIELD OFFICIAL (AUTO-VERIFIED)</option>
+                </select>
+              </label>
+              <div className="coords-row">
+                <label className="form-field">
+                  <span>LATITUDE (°N)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={reportLat}
+                    onChange={(e) => setReportLat(e.target.value)}
+                    required
+                  />
+                </label>
+                <label className="form-field">
+                  <span>LONGITUDE (°E)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={reportLng}
+                    onChange={(e) => setReportLng(e.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+              <label className="form-field">
+                <span>INCIDENT OBSERVATION</span>
+                <textarea
+                  rows={3}
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  placeholder="Describe ground cracks, debris, road blockage..."
+                  required
+                />
+              </label>
+              <label className="form-field">
+                <span>PHOTO URL (OPTIONAL)</span>
+                <input
+                  type="url"
+                  value={reportPhotoUrl}
+                  onChange={(e) => setReportPhotoUrl(e.target.value)}
+                  placeholder="https://example.com/photo.jpg"
+                />
+              </label>
+              <button type="submit" className="run" disabled={submittingReport || !reportDescription.trim()}>
+                {submittingReport ? "SUBMITTING…" : "SUBMIT REPORT →"}
+              </button>
+              {reportResult && (
+                <p className={`report-status ${reportResult.error ? "error" : "success"}`}>
+                  {reportResult.text}
+                </p>
+              )}
+            </div>
+          </form>
+          <div className="report-list">
+            {reports.length === 0 ? (
+              <div className="alert-empty">NO FIELD REPORTS FILED YET</div>
+            ) : (
+              reports.map((report) => (
+                <article className={`report-card ${report.status}`} key={report.id}>
+                  <div className="report-meta">
+                    <span className={`status-tag ${report.status}`}>{report.status.toUpperCase()}</span>
+                    <span>{report.source === "field_official" ? "FIELD OFFICIAL" : "CITIZEN"}</span>
+                    <span>{report.lat.toFixed(2)}°N / {report.lng.toFixed(2)}°E</span>
+                    <span>{reportTime(report)}</span>
+                  </div>
+                  <p className="report-desc">{report.description}</p>
+                  {report.photo_url && (
+                    <a
+                      href={report.photo_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="photo-link"
+                    >
+                      VIEW ATTACHED PHOTO ↗
+                    </a>
+                  )}
+                </article>
+              ))
+            )}
           </div>
         </div>
       </section>

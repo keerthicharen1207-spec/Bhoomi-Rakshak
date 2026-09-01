@@ -109,3 +109,77 @@ def test_escalation_to_severe_adds_severe_alert_without_duplicates(tmp_path, mon
 
         client.post("/simulate-rainfall", json={"zone_id": sohra["id"], "rainfall_mm": 200.0})
         assert len(client.get("/alerts").json()) == 2
+
+
+def test_submit_citizen_report_starts_pending(tmp_path, monkeypatch):
+    database = tmp_path / "test.db"
+    monkeypatch.setattr("backend.main.DATABASE_PATH", database)
+    with TestClient(app) as client:
+        response = client.post(
+            "/reports",
+            json={
+                "lat": 25.27,
+                "lng": 91.73,
+                "description": "Cracks widening on the slope face",
+                "photo_url": "https://example.com/photo.jpg",
+                "source": "citizen",
+            },
+        )
+
+    assert response.status_code == 200
+    report = response.json()
+    assert report["status"] == "pending"
+    assert report["description"] == "Cracks widening on the slope face"
+    assert report["photo_url"] == "https://example.com/photo.jpg"
+    assert report["id"] == 1
+    assert report["created_at"]
+
+
+def test_submit_field_official_report_is_auto_verified(tmp_path, monkeypatch):
+    database = tmp_path / "test.db"
+    monkeypatch.setattr("backend.main.DATABASE_PATH", database)
+    with TestClient(app) as client:
+        response = client.post(
+            "/reports",
+            json={
+                "lat": 25.45,
+                "lng": 92.20,
+                "description": "Roadside slump blocking half the carriageway",
+                "photo_url": "",
+                "source": "field_official",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "verified"
+
+
+def test_reports_listed_newest_first(tmp_path, monkeypatch):
+    database = tmp_path / "test.db"
+    monkeypatch.setattr("backend.main.DATABASE_PATH", database)
+    with TestClient(app) as client:
+        client.post("/reports", json={"lat": 25.27, "lng": 91.73, "description": "First report", "photo_url": "", "source": "citizen"})
+        client.post("/reports", json={"lat": 25.67, "lng": 94.11, "description": "Second report", "photo_url": "", "source": "field_official"})
+
+        reports = client.get("/reports").json()
+
+    assert [report["id"] for report in reports] == [2, 1]
+
+
+def test_report_rejects_invalid_payloads(tmp_path, monkeypatch):
+    database = tmp_path / "test.db"
+    monkeypatch.setattr("backend.main.DATABASE_PATH", database)
+    with TestClient(app) as client:
+        bad_latitude = client.post(
+            "/reports", json={"lat": 200.0, "lng": 91.73, "description": "x", "photo_url": "", "source": "citizen"}
+        )
+        bad_source = client.post(
+            "/reports", json={"lat": 25.27, "lng": 91.73, "description": "x", "photo_url": "", "source": "drone"}
+        )
+        empty_description = client.post(
+            "/reports", json={"lat": 25.27, "lng": 91.73, "description": "", "photo_url": "", "source": "citizen"}
+        )
+
+    assert bad_latitude.status_code == 422
+    assert bad_source.status_code == 422
+    assert empty_description.status_code == 422

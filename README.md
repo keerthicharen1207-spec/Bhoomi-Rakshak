@@ -27,3 +27,5 @@ Open `http://localhost:3000` after starting both services.
 | GET | /risk-scores | All zones with current score/level |
 | POST | /simulate-rainfall | `{zone_id, rainfall_mm}` → recomputed zone risk |
 | GET | /alerts | Auto-generated High/Severe alerts, newest first |
+| POST | /reports | `{lat, lng, description, photo_url, source}` → create incident report |
+| GET | /reports | Incident reports (citizen & field official), newest first |

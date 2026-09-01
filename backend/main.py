@@ -8,11 +8,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from typing import Literal
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .alerts import build_messages, should_alert
+from .reports import status_for
 from .risk_engine import apply_rainfall, calculate_risk_score, risk_level
 
 DATABASE_PATH = Path(os.getenv("NER_DATABASE_PATH", Path(__file__).with_name("ner.db")))
@@ -74,6 +77,20 @@ def initialise_database() -> None:
                 zone_id INTEGER NOT NULL,
                 level TEXT NOT NULL,
                 message TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lat REAL NOT NULL,
+                lng REAL NOT NULL,
+                description TEXT NOT NULL,
+                photo_url TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL,
+                status TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
             """
@@ -177,3 +194,47 @@ def get_alerts() -> list[dict]:
         }
         for row in rows
     ]
+
+
+class ReportCreate(BaseModel):
+    lat: float = Field(ge=-90.0, le=90.0)
+    lng: float = Field(ge=-180.0, le=180.0)
+    description: str = Field(min_length=1)
+    photo_url: str = ""
+    source: Literal["citizen", "field_official"]
+
+
+@app.post("/reports")
+def create_report(report: ReportCreate) -> dict:
+    status = status_for(report.source)
+    created_at = datetime.now(timezone.utc).isoformat()
+    with closing(connect()) as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO reports (lat, lng, description, photo_url, source, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                report.lat,
+                report.lng,
+                report.description,
+                report.photo_url,
+                report.source,
+                status,
+                created_at,
+            ),
+        )
+        report_id = cursor.lastrowid
+        connection.commit()
+        row = connection.execute(
+            "SELECT * FROM reports WHERE id = ?", (report_id,)
+        ).fetchone()
+    return dict(row)
+
+
+@app.get("/reports")
+def get_reports() -> list[dict]:
+    with closing(connect()) as connection:
+        rows = connection.execute("SELECT * FROM reports ORDER BY id DESC").fetchall()
+    return [dict(row) for row in rows]
+
