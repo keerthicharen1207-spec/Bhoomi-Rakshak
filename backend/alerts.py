@@ -20,6 +20,10 @@ ZONE_ROADS = {
     "Idukki District": "NH85",
     "Mandi District": "NH3",
     "Rudraprayag District": "NH107",
+    "Malappuram District": "NH966",
+    "Thrissur District": "NH544",
+    "Nilgiris District": "NH181",
+    "Kanyakumari District": "NH844",
     # Legacy fallbacks
     "Sohra": "NH6",
     "Jowai": "NH44",
