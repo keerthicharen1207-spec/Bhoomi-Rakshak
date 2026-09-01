@@ -6,10 +6,11 @@ from contextlib import closing
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
-from .risk_engine import calculate_risk_score, risk_level
+from .risk_engine import apply_rainfall, calculate_risk_score, risk_level
 
 DATABASE_PATH = Path(os.getenv("NER_DATABASE_PATH", Path(__file__).with_name("ner.db")))
 
@@ -89,3 +90,35 @@ def get_risk_scores() -> list[dict]:
     with closing(connect()) as connection:
         rows = connection.execute("SELECT * FROM zones ORDER BY risk_score DESC, name").fetchall()
     return [dict(row) for row in rows]
+
+
+class RainfallSimulation(BaseModel):
+    zone_id: int
+    rainfall_mm: float = Field(ge=0)
+
+
+@app.post("/simulate-rainfall")
+def simulate_rainfall(simulation: RainfallSimulation) -> dict:
+    with closing(connect()) as connection:
+        zone = connection.execute(
+            "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
+        ).fetchone()
+        if zone is None:
+            raise HTTPException(status_code=404, detail=f"Zone {simulation.zone_id} not found")
+        rain_24h, rain_7d = apply_rainfall(simulation.rainfall_mm, zone["rainfall_7d_norm"])
+        score = calculate_risk_score(
+            zone["slope_angle_norm"], rain_24h, rain_7d, zone["historical_density_norm"]
+        )
+        connection.execute(
+            """
+            UPDATE zones
+            SET rainfall_24h_norm = ?, rainfall_7d_norm = ?, risk_score = ?, risk_level = ?
+            WHERE id = ?
+            """,
+            (rain_24h, rain_7d, score, risk_level(score), simulation.zone_id),
+        )
+        connection.commit()
+        updated = connection.execute(
+            "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
+        ).fetchone()
+    return dict(updated)

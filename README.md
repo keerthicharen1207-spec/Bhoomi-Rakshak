@@ -1,6 +1,6 @@
-#Bhoomi-Rakshak
+# Bhoomi-Rakshak
 
-Ticket 1 provides the first runnable vertical slice: seeded Northeast India monitoring zones, SQLite persistence, the weighted risk engine, and a dashboard consuming `GET /risk-scores`.
+Early warning and landslide risk monitoring MVP for Northeast India. Current slice: seeded NER zones, the weighted risk engine, live rainfall simulation, and a dashboard consuming the API.
 
 ## Run the API
 
@@ -18,3 +18,11 @@ npm run dev
 ```
 
 Open `http://localhost:3000` after starting both services.
+
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | /health | Service status |
+| GET | /risk-scores | All zones with current score/level |
+| POST | /simulate-rainfall | `{zone_id, rainfall_mm}` → recomputed zone risk |
