@@ -549,11 +549,15 @@ export default function Dashboard() {
                 🎯 TARGET DISTRICT:
               </span>
               <select
-                value={selectedZoneId ?? allZones[0]?.id ?? ""}
-                onChange={(event) => setSelectedZoneId(Number(event.target.value))}
+                value={selectedZoneId ?? ""}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setSelectedZoneId(val ? Number(val) : null);
+                }}
                 disabled={allZones.length === 0}
                 style={{ fontSize: "12px", padding: "8px 12px", border: "1px solid var(--line)", borderRadius: "3px", background: "#fafcfa", color: "var(--ink)", fontFamily: "'DM Mono', monospace", cursor: "pointer", width: "100%", maxWidth: "420px" }}
               >
+                <option value="">-- SELECT DISTRICT --</option>
                 {allZones.map((zone) => (
                   <option key={zone.id} value={zone.id}>
                     {zone.name.toUpperCase()} · {zone.state.toUpperCase()}
@@ -686,7 +690,11 @@ export default function Dashboard() {
               disabled={simulating || selectedZoneId === null}
               style={{ padding: "12px 28px", fontWeight: 700 }}
             >
-              {simulating ? "RECALCULATING ENGINES…" : "RUN MULTI-HAZARD SIMULATION →"}
+              {selectedZoneId === null
+                ? "SELECT A DISTRICT FIRST"
+                : simulating
+                ? "RECALCULATING ENGINES…"
+                : "RUN MULTI-HAZARD SIMULATION →"}
             </button>
           </div>
 
