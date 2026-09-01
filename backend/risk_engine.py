@@ -1,6 +1,6 @@
 """Unified Multi-Hazard Risk Scoring & Physics-ML Hybrid Engine."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from .physics_engine import (
     calculate_infinite_slope_fs,
     calculate_rational_peak_discharge,
@@ -66,6 +66,7 @@ def evaluate_multihazard_zone_risk(
     pop_density: float = 850.0,
     state: str = "India",
     district_name: str = "",
+    pga_g: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Perform hybrid Physics + Machine Learning multi-hazard evaluation for a zone across all disaster classes."""
 
@@ -102,6 +103,7 @@ def evaluate_multihazard_zone_risk(
         state=state,
         slope_deg=slope_deg,
         district_name=district_name,
+        pga_g=pga_g,
     )
     storm_info = calculate_severe_storm_index(
         wind_kmh=wind_kmh,
@@ -145,12 +147,15 @@ def evaluate_multihazard_zone_risk(
     fs_risk_component = max(0.0, min(1.0, (2.0 - factor_of_safety) / 1.0)) * 100.0
     ml_landslide_component = landslide_susceptibility * 100.0
 
-    combined_score = round(
-        (0.50 * weighted_score)
-        + (0.25 * fs_risk_component)
-        + (0.25 * ml_landslide_component),
-        2,
-    )
+    landslide_score = (0.50 * weighted_score) + (0.25 * fs_risk_component) + (0.25 * ml_landslide_component)
+    flood_score = min(100.0, (flash_flood_q / 35.0) * 60.0 + (flood_depth_m / 3.0) * 40.0)
+    wildfire_score = wildfire_cbi["cbi_score"]
+    seismic_score = seismic_info["coseismic_risk_score"]
+    storm_score = storm_info["storm_score"]
+
+    # Composite multi-hazard risk score incorporates any extreme localized hazards
+    max_hazard_score = max(landslide_score, flood_score, wildfire_score, seismic_score, storm_score)
+    combined_score = round(max(landslide_score, (0.55 * max_hazard_score + 0.45 * landslide_score)), 2)
     combined_level = risk_level(combined_score)
 
     # 5. Multi-Disaster Breakdown Suite

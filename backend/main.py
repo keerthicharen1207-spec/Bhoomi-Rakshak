@@ -142,24 +142,43 @@ def initialise_database() -> None:
         connection.commit()
 
 
-def enrich_zone_with_multihazard_data(zone_dict: dict) -> dict:
+def enrich_zone_with_multihazard_data(zone_dict: dict, overrides: Optional[dict] = None) -> dict:
     weather = fetch_zone_live_weather(zone_dict["lat"], zone_dict["lng"])
+    ov = overrides or {}
+    
+    temp_c = ov.get("temp_c") if ov.get("temp_c") is not None else weather.get("temp_c", 24.0)
+    rh_pct = ov.get("rh_pct") if ov.get("rh_pct") is not None else weather.get("humidity_pct", 75.0)
+    wind_kmh = ov.get("wind_kmh") if ov.get("wind_kmh") is not None else weather.get("wind_kmh", 12.0)
+    pga_g = ov.get("pga_g")
+
     eval_res = evaluate_multihazard_zone_risk(
         slope_angle_norm=zone_dict["slope_angle_norm"],
         rainfall_24h_norm=zone_dict["rainfall_24h_norm"],
         rainfall_7d_norm=zone_dict["rainfall_7d_norm"],
         historical_density_norm=zone_dict["historical_density_norm"],
-        temp_c=weather.get("temp_c", 24.0),
-        rh_pct=weather.get("humidity_pct", 75.0),
-        wind_kmh=weather.get("wind_kmh", 12.0),
+        temp_c=temp_c,
+        rh_pct=rh_pct,
+        wind_kmh=wind_kmh,
         pop_density=zone_dict.get("pop_density", 200.0),
         state=zone_dict.get("state", "India"),
         district_name=zone_dict.get("name", ""),
+        pga_g=pga_g,
     )
+    zone_dict["risk_score"] = eval_res["risk_score"]
+    zone_dict["risk_level"] = eval_res["risk_level"]
     zone_dict["physics"] = eval_res["physics"]
     zone_dict["ml"] = eval_res["ml"]
     zone_dict["disasters"] = eval_res.get("disasters", {})
-    zone_dict["live_weather"] = weather
+    
+    # Store simulated weather adjustments for live feedback
+    disp_weather = dict(weather)
+    if ov.get("temp_c") is not None:
+        disp_weather["temp_c"] = ov["temp_c"]
+    if ov.get("rh_pct") is not None:
+        disp_weather["humidity_pct"] = ov["rh_pct"]
+    if ov.get("wind_kmh") is not None:
+        disp_weather["wind_kmh"] = ov["wind_kmh"]
+    zone_dict["live_weather"] = disp_weather
     return zone_dict
 
 
@@ -181,51 +200,34 @@ def get_states() -> list[str]:
 
 
 @app.get("/districts")
-def get_districts(state: Optional[str] = Query(default=None, description="Filter by Indian state name")) -> list[dict]:
-    """Return all Indian districts with multi-hazard risk metrics.
-    Optionally filter by ?state=Uttarakhand
-    """
+def get_districts(state: Optional[str] = Query(None, description="Filter districts by Indian state")) -> list[dict]:
+    """Return all 14 Indian districts enriched with live multi-hazard metrics and weather."""
     with closing(connect()) as connection:
         if state:
-            rows = connection.execute(
-                "SELECT * FROM zones WHERE state = ? ORDER BY risk_score DESC, name",
-                (state,)
-            ).fetchall()
+            rows = connection.execute("SELECT * FROM zones WHERE state = ? ORDER BY name", (state,)).fetchall()
         else:
-            rows = connection.execute(
-                "SELECT * FROM zones ORDER BY risk_score DESC, name"
-            ).fetchall()
+            rows = connection.execute("SELECT * FROM zones ORDER BY state, name").fetchall()
     return [enrich_zone_with_multihazard_data(dict(row)) for row in rows]
 
 
 @app.get("/risk-scores")
-def get_risk_scores(state: Optional[str] = Query(default=None)) -> list[dict]:
-    """Alias for /districts — maintains backward compatibility with frontend."""
-    return get_districts(state=state)
+def get_risk_scores() -> list[dict]:
+    with closing(connect()) as connection:
+        rows = connection.execute("SELECT * FROM zones ORDER BY id").fetchall()
+    return [enrich_zone_with_multihazard_data(dict(row)) for row in rows]
 
 
-@app.get("/weather-status")
-def get_weather_status() -> dict:
-    sample = fetch_zone_live_weather(25.27, 91.73)
-    return {
-        "api_key_configured": bool(OPENWEATHER_API_KEY),
-        "status": sample["status"],
-        "message": sample.get("message", "Operational"),
-        "sample_weather": sample,
-        "region": "India",
-    }
-
-
-@app.post("/sync-weather")
-def sync_weather() -> dict:
+@app.post("/sync-live-weather")
+def sync_live_weather() -> dict:
+    """Fetch live OpenWeather observations for each district and update current 24h/7d rainfall norms."""
+    synced = []
     with closing(connect()) as connection:
         rows = connection.execute("SELECT * FROM zones").fetchall()
-        synced = []
         for row in rows:
             z = dict(row)
             weather = fetch_zone_live_weather(z["lat"], z["lng"])
-            rain_mm = weather.get("rainfall_mm", 15.0)
-            rain_24h, rain_7d = apply_rainfall(rain_mm, z["rainfall_7d_norm"])
+            obs_rain = weather.get("rainfall_mm", 0.0)
+            rain_24h, rain_7d = apply_rainfall(obs_rain, z["rainfall_7d_norm"])
             score = calculate_risk_score(
                 z["slope_angle_norm"], rain_24h, rain_7d, z["historical_density_norm"]
             )
@@ -242,36 +244,54 @@ def sync_weather() -> dict:
     return {"status": "synced", "zones_updated": synced}
 
 
-class RainfallSimulation(BaseModel):
+class MultiHazardSimulation(BaseModel):
     zone_id: int
-    rainfall_mm: float = Field(ge=0)
+    rainfall_mm: float = Field(default=0.0, ge=0)
+    pga_g: Optional[float] = Field(default=None, ge=0, le=2.0)
+    temperature_c: Optional[float] = Field(default=None, ge=-20, le=60)
+    humidity_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    wind_kmh: Optional[float] = Field(default=None, ge=0, le=350)
 
 
+# Backward-compatible alias for existing tests and clients
+RainfallSimulation = MultiHazardSimulation
+
+
+@app.post("/simulate-hazard")
 @app.post("/simulate-rainfall")
-def simulate_rainfall(simulation: RainfallSimulation) -> dict:
+def simulate_hazard(simulation: MultiHazardSimulation) -> dict:
     with closing(connect()) as connection:
         zone = connection.execute(
             "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
         ).fetchone()
         if zone is None:
             raise HTTPException(status_code=404, detail=f"District ID {simulation.zone_id} not found")
+        
         rain_24h, rain_7d = apply_rainfall(simulation.rainfall_mm, zone["rainfall_7d_norm"])
-        score = calculate_risk_score(
-            zone["slope_angle_norm"], rain_24h, rain_7d, zone["historical_density_norm"]
-        )
+        
+        overrides = {
+            "pga_g": simulation.pga_g,
+            "temp_c": simulation.temperature_c,
+            "rh_pct": simulation.humidity_pct,
+            "wind_kmh": simulation.wind_kmh,
+        }
+        
+        zone_dict = dict(zone)
+        zone_dict["rainfall_24h_norm"] = rain_24h
+        zone_dict["rainfall_7d_norm"] = rain_7d
+        
+        enriched = enrich_zone_with_multihazard_data(zone_dict, overrides=overrides)
+        
         connection.execute(
             """
             UPDATE zones
             SET rainfall_24h_norm = ?, rainfall_7d_norm = ?, risk_score = ?, risk_level = ?
             WHERE id = ?
             """,
-            (rain_24h, rain_7d, score, risk_level(score), simulation.zone_id),
+            (rain_24h, rain_7d, enriched["risk_score"], enriched["risk_level"], simulation.zone_id),
         )
         connection.commit()
-        updated = connection.execute(
-            "SELECT * FROM zones WHERE id = ?", (simulation.zone_id,)
-        ).fetchone()
-        enriched = enrich_zone_with_multihazard_data(dict(updated))
+        
         if should_alert(zone["id"], zone["risk_level"], enriched["risk_level"]):
             messages = build_messages(
                 enriched, enriched["risk_level"], enriched["risk_score"], zone["risk_score"]

@@ -10,7 +10,7 @@ Implements deterministic physics equations for multi-hazard monitoring:
 """
 
 import math
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 def calculate_infinite_slope_fs(
@@ -109,6 +109,7 @@ def calculate_seismic_hazard(
     state: str = "India",
     slope_deg: float = 25.0,
     district_name: str = "",
+    pga_g: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Calculate Seismic / Earthquake Vulnerability according to BIS IS 1893:2016."""
     state_lower = state.lower()
@@ -120,35 +121,48 @@ def calculate_seismic_hazard(
         zone_code = "Zone V"
         zone_factor_z = 0.36
         category = "Very High Damage Risk"
-        pga_g = 0.36
+        default_pga = 0.36
     # Zone IV (Z = 0.24): Shimla, Darjeeling, remaining Uttarakhand/HP, parts of J&K, Delhi
     elif any(s in state_lower for s in ["himachal", "uttarakhand", "west bengal"]) or \
          any(d in name_lower for d in ["shimla", "darjeeling"]):
         zone_code = "Zone IV"
         zone_factor_z = 0.24
         category = "High Damage Risk"
-        pga_g = 0.24
+        default_pga = 0.24
     # Zone III (Z = 0.16): Western Ghats (Kerala - Wayanad, Idukki), Maharashtra, Tamil Nadu
     elif "kerala" in state_lower or any(d in name_lower for d in ["wayanad", "idukki"]):
         zone_code = "Zone III"
         zone_factor_z = 0.16
         category = "Moderate Damage Risk"
-        pga_g = 0.16
+        default_pga = 0.16
     else:
         zone_code = "Zone III"
         zone_factor_z = 0.16
         category = "Moderate Damage Risk"
-        pga_g = 0.16
+        default_pga = 0.16
+
+    effective_pga = pga_g if pga_g is not None else default_pga
+
+    # Dynamic categorization when simulated PGA is provided
+    if pga_g is not None:
+        if effective_pga >= 0.40:
+            category = "Extreme Seismic Ground Motion (M7.5+ Quake)"
+        elif effective_pga >= 0.25:
+            category = "Severe Ground Acceleration"
+        elif effective_pga >= 0.15:
+            category = "Moderate Ground Motion"
+        else:
+            category = "Minor Ambient Tremor"
 
     # Co-seismic slope failure acceleration susceptibility: Newmark sliding block proxy
     # Higher slope + higher PGA = increased co-seismic landslide hazard
-    coseismic_risk_score = round(min(100.0, (zone_factor_z / 0.36) * (slope_deg / 45.0) * 100.0), 1)
+    coseismic_risk_score = round(min(100.0, (effective_pga / 0.36) * (slope_deg / 45.0) * 100.0), 1)
 
     return {
         "zone_code": zone_code,
         "zone_factor_z": zone_factor_z,
         "category": category,
-        "pga_g": pga_g,
+        "pga_g": effective_pga,
         "coseismic_risk_score": coseismic_risk_score,
     }
 
