@@ -120,28 +120,24 @@ def calculate_seismic_hazard(
        any(d in name_lower for d in ["rudraprayag", "chamoli", "mandi"]):
         zone_code = "Zone V"
         zone_factor_z = 0.36
-        category = "Very High Damage Risk"
-        default_pga = 0.36
+        default_ambient_pga = 0.04
     # Zone IV (Z = 0.24): Shimla, Darjeeling, remaining Uttarakhand/HP, parts of J&K, Delhi
     elif any(s in state_lower for s in ["himachal", "uttarakhand", "west bengal"]) or \
          any(d in name_lower for d in ["shimla", "darjeeling"]):
         zone_code = "Zone IV"
         zone_factor_z = 0.24
-        category = "High Damage Risk"
-        default_pga = 0.24
+        default_ambient_pga = 0.03
     # Zone III (Z = 0.16): Western Ghats (Kerala - Wayanad, Idukki), Maharashtra, Tamil Nadu
-    elif "kerala" in state_lower or any(d in name_lower for d in ["wayanad", "idukki"]):
+    elif "kerala" in state_lower or any(d in name_lower for d in ["wayanad", "idukki", "nilgiris"]):
         zone_code = "Zone III"
         zone_factor_z = 0.16
-        category = "Moderate Damage Risk"
-        default_pga = 0.16
+        default_ambient_pga = 0.02
     else:
         zone_code = "Zone III"
         zone_factor_z = 0.16
-        category = "Moderate Damage Risk"
-        default_pga = 0.16
+        default_ambient_pga = 0.02
 
-    effective_pga = pga_g if pga_g is not None else default_pga
+    effective_pga = pga_g if pga_g is not None else default_ambient_pga
 
     # Dynamic categorization when simulated PGA is provided
     if pga_g is not None:
@@ -153,6 +149,8 @@ def calculate_seismic_hazard(
             category = "Moderate Ground Motion"
         else:
             category = "Minor Ambient Tremor"
+    else:
+        category = f"{zone_code} Baseline Ambient Microseismicity"
 
     # Co-seismic slope failure acceleration susceptibility: Newmark sliding block proxy
     # Higher slope + higher PGA = increased co-seismic landslide hazard

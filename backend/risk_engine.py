@@ -102,7 +102,7 @@ def evaluate_multihazard_zone_risk(
     rain_7d_mm = rainfall_7d_norm * RAINFALL_24H_MAX_MM * 7.0 / 2.0
 
     # 2. Physical engineering calculations
-    water_table_ratio = min(0.3 + (rainfall_24h_norm * 0.7), 1.0)
+    water_table_ratio = min(0.05 + (rainfall_24h_norm * 0.65) + (rainfall_7d_norm * 0.30), 1.0)
     factor_of_safety = calculate_infinite_slope_fs(
         slope_deg=slope_deg,
         water_table_ratio=water_table_ratio,
